@@ -39,6 +39,19 @@ if not exist "node_modules\" (
         exit /b 1
     )
 ) else (
+    :: Verify native binary compatibility (e.g. if node_modules was copied from Linux)
+    node -e "try { require('better-sqlite3'); } catch(e) { process.exit(1); }" >nul 2>nul
+    if %errorlevel% neq 0 (
+        echo [NOTICE] Native binary mismatch detected (e.g. Linux binaries transferred to Windows).
+        echo Reinstalling dependencies for Windows x64...
+        call npm install
+        if %errorlevel% neq 0 (
+            color 0C
+            echo [ERROR] Failed to recompile/reinstall native modules.
+            pause
+            exit /b 1
+        )
+    )
     echo [OK] Dependencies verified.
 )
 
