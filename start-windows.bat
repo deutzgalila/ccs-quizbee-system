@@ -1,7 +1,10 @@
 @echo off
-setlocal enabledelayedexpansion
-title OLFU Quiz Bee LAN Server
+setlocal EnableExtensions EnableDelayedExpansion
+title OLFU IT Olympics - Quiz Bee LAN Server
 color 0A
+
+:: Force working directory to the folder containing this batch file
+cd /d "%~dp0"
 
 echo ========================================================================
 echo    OLFU IT OLYMPICS LAN QUIZ BEE MANAGEMENT SYSTEM (ITPM 311)
@@ -9,15 +12,14 @@ echo    Windows Automated Quick-Start Launcher
 echo ========================================================================
 echo.
 
-:: 1. Check Node.js
+:: 1. Check Node.js in PATH
 where node >nul 2>nul
 if %errorlevel% neq 0 (
     color 0C
     echo [ERROR] Node.js is not installed or not found in system PATH.
-    echo Please download and install Node.js LTS (64-bit) from:
-    echo    https://nodejs.org/
+    echo Please install Node.js LTS (64-bit) from: https://nodejs.org/
     echo.
-    echo After installing, restart Command Prompt and run this script again.
+    echo If Node.js was just installed, please close this window and reopen it.
     echo.
     pause
     exit /b 1
@@ -27,7 +29,7 @@ for /f "delims=" %%v in ('node -v') do set NODE_VER=%%v
 echo [OK] Node.js detected: %NODE_VER%
 
 :: 2. Check and Install Dependencies
-if not exist "node_modules\" (
+if not exist "node_modules" (
     echo.
     echo [1/3] Installing dependencies (npm install)...
     call npm install
@@ -39,13 +41,13 @@ if not exist "node_modules\" (
         exit /b 1
     )
 ) else (
-    :: Verify native binary compatibility (e.g. if node_modules was copied from Linux)
+    REM Check if native module better-sqlite3 loads properly
     node -e "try { require('better-sqlite3'); } catch(e) { process.exit(1); }" >nul 2>nul
-    if %errorlevel% neq 0 (
+    if !errorlevel! neq 0 (
         echo [NOTICE] Native binary mismatch detected (e.g. Linux binaries transferred to Windows).
         echo Reinstalling dependencies for Windows x64...
         call npm install
-        if %errorlevel% neq 0 (
+        if !errorlevel! neq 0 (
             color 0C
             echo [ERROR] Failed to recompile/reinstall native modules.
             pause
@@ -82,8 +84,10 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4 Address"') do (
 echo.
 
 echo ========================================================================
-echo Starting Quiz Bee Server... (Press Ctrl+C to stop)
+echo Starting Quiz Bee Server... (Keep this window open during the event)
 echo ========================================================================
 echo.
 call npm start
+echo.
+echo Server stopped.
 pause

@@ -1,9 +1,13 @@
 @echo off
+setlocal EnableExtensions
 title Open Quiz Bee Port 3000 in Windows Firewall
+cd /d "%~dp0"
+
 echo ========================================================================
 echo   Configuring Windows Firewall for Port 3000 (Inbound TCP)
 echo ========================================================================
 echo.
+
 netsh advfirewall firewall add rule name="OLFU QuizBee Server" dir=in action=allow protocol=TCP localport=3000
 if %errorlevel% equ 0 (
     echo.
@@ -12,7 +16,7 @@ if %errorlevel% equ 0 (
 ) else (
     echo.
     echo [FAILED] Administrator privileges required.
-    echo Please right-click this file and select "Run as administrator".
+    echo Please right-click allow-firewall-windows.bat and select "Run as administrator".
 )
 echo.
 pause
