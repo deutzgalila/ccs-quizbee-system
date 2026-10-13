@@ -122,11 +122,19 @@ function parseCsvContent(content) {
  * @returns {{ success: boolean, importedCount: number, errors: string[] }}
  */
 function importQuestionsFromContent(content, dbInstance, options = {}) {
-  if (typeof content !== 'string' || !content.trim()) {
+  if (typeof content !== 'string') {
     return {
       success: false,
       importedCount: 0,
-      errors: ['CSV content is empty.']
+      errors: ['Invalid CSV content.']
+    };
+  }
+
+  if (!content.trim()) {
+    return {
+      success: true,
+      importedCount: 0,
+      errors: []
     };
   }
 

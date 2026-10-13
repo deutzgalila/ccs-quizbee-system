@@ -134,9 +134,9 @@
 
       <!-- 3. Animated Leaderboard Podium Screen -->
       <section id="stage-leaderboard" class="stage-leaderboard hidden">
-        <div class="text-center">
-          <h2 style="font-size: 2.5rem; font-weight: 800; margin-bottom: 0.25rem; color: var(--text-primary);">Tournament Standings</h2>
-          <p style="color: var(--text-secondary); font-size: 1.1rem;">Live Leaderboard &bull; Ranked by Total Points</p>
+        <div class="stage-leaderboard-header text-center">
+          <h2 style="font-size: 2.5rem; font-weight: 800; margin-bottom: 0.35rem; color: var(--text-primary);">Tournament Standings</h2>
+          <p style="color: var(--text-secondary); font-size: 1.1rem; margin-bottom: 0;">Live Leaderboard &bull; Ranked by Total Points</p>
         </div>
 
         <!-- 3-Tier Dynamic Podium -->
@@ -172,21 +172,23 @@
           </div>
         </div>
 
-        <!-- Ranked Table for Ranks 4+ -->
-        <table id="stage-roster-table" class="stage-roster-table">
-          <thead>
-            <tr>
-              <th style="width: 80px;">Rank</th>
-              <th>Contestant Name</th>
-              <th>Terminal</th>
-              <th>Department / Section</th>
-              <th style="text-align: right;">Total Score</th>
-            </tr>
-          </thead>
-          <tbody id="stage-roster-tbody">
-            <!-- Dynamically populated rows -->
-          </tbody>
-        </table>
+        <!-- Scrollable Ranked Table Container for Ranks 4+ -->
+        <div class="stage-roster-wrapper">
+          <table id="stage-roster-table" class="stage-roster-table">
+            <thead>
+              <tr>
+                <th style="width: 80px;">Rank</th>
+                <th>Contestant Name</th>
+                <th>Terminal</th>
+                <th>Department / Section</th>
+                <th style="text-align: right;">Total Score</th>
+              </tr>
+            </thead>
+            <tbody id="stage-roster-tbody">
+              <!-- Dynamically populated rows -->
+            </tbody>
+          </table>
+        </div>
       </section>
     </main>
   </div>

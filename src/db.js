@@ -669,6 +669,7 @@ function getLeaderboard(roundId) {
       c.terminal_number AS terminalNumber,
       c.department_or_section AS department,
       COALESCE(SUM(CASE WHEN s.is_correct = 1 ${filterClause} THEN s.awarded_points ELSE 0 END), 0) + COALESCE(c.score_adjustment, 0) AS score,
+      COALESCE(SUM(CASE WHEN s.is_correct = 1 ${filterClause} THEN s.awarded_points ELSE 0 END), 0) + COALESCE(c.score_adjustment, 0) AS totalScore,
       COALESCE(MIN(CASE WHEN s.is_correct = 1 ${filterClause} THEN s.server_time_ms ELSE NULL END), 0) AS lastSubmitTimeMs,
       RANK() OVER (
         ORDER BY 

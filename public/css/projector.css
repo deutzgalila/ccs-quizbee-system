@@ -382,44 +382,53 @@
 .stage-leaderboard {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.25rem;
   max-width: 1500px;
   width: 100%;
   margin: 0 auto;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.stage-leaderboard-header {
+  flex-shrink: 0;
+  text-align: center;
 }
 
 .podium-container {
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  gap: 2.25rem;
-  height: 380px;
-  padding-bottom: 1rem;
+  gap: 2rem;
+  height: 310px;
+  padding-bottom: 0.5rem;
+  flex-shrink: 0;
 }
 
 .podium-column {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 240px;
+  width: 230px;
 }
 
 .podium-card {
   background-color: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xl);
-  padding: 1.25rem;
+  padding: 1rem 1.15rem;
   text-align: center;
   width: 100%;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.65rem;
   box-shadow: var(--shadow-sm);
   transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .podium-name {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   font-weight: 700;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.2rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -427,7 +436,7 @@
 }
 
 .podium-score {
-  font-size: 1.85rem;
+  font-size: 1.75rem;
   font-weight: 900;
   font-family: var(--font-mono);
   color: var(--color-accent);
@@ -440,26 +449,26 @@
   justify-content: center;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   font-family: var(--font-mono);
-  font-size: 3rem;
+  font-size: 2.75rem;
   font-weight: 900;
   color: #ffffff;
   transition: height 1s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .podium-gold .podium-step {
-  height: 220px;
+  height: 180px;
   background-color: #b45309;
   border-top: 2px solid #f59e0b;
 }
 
 .podium-silver .podium-step {
-  height: 160px;
+  height: 130px;
   background-color: #475569;
   border-top: 2px solid #94a3b8;
 }
 
 .podium-bronze .podium-step {
-  height: 120px;
+  height: 95px;
   background-color: #78350f;
   border-top: 2px solid #d97706;
 }
@@ -482,21 +491,50 @@
   box-shadow: 0 4px 12px rgba(180, 83, 9, 0.2);
 }
 
+/* Scrollable Container for Ranked Table */
+.stage-roster-wrapper {
+  flex: 1;
+  min-height: 180px;
+  max-height: 380px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background-color: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-active) var(--bg-card);
+}
+
+.stage-roster-wrapper::-webkit-scrollbar {
+  width: 8px;
+}
+
+.stage-roster-wrapper::-webkit-scrollbar-track {
+  background: var(--bg-card);
+  border-radius: var(--radius-xl);
+}
+
+.stage-roster-wrapper::-webkit-scrollbar-thumb {
+  background: var(--border-active);
+  border-radius: var(--radius-full);
+}
+
+.stage-roster-wrapper::-webkit-scrollbar-thumb:hover {
+  background: var(--color-rose);
+}
+
 /* Ranked Roster Table for Ranks 4+ */
 .stage-roster-table {
   width: 100%;
   border-collapse: collapse;
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
-  overflow: hidden;
-  box-shadow: var(--shadow-sm);
+  background-color: transparent;
   color: var(--text-primary);
   transition: background-color 0.2s ease;
 }
 
 .stage-roster-table th, .stage-roster-table td {
-  padding: 0.85rem 1.5rem;
+  padding: 0.75rem 1.35rem;
   text-align: left;
 }
 
@@ -508,6 +546,9 @@
   letter-spacing: 0.05em;
   font-weight: 700;
   border-bottom: 1px solid var(--border-subtle);
+  position: sticky;
+  top: 0;
+  z-index: 5;
 }
 
 .stage-roster-table tr:not(:last-child) {

@@ -213,8 +213,9 @@
         data.leaderboard.forEach((item) => {
           if (item && item.pin) {
             const scoreEl = document.getElementById(`score-${item.pin}`);
-            if (scoreEl && item.score !== undefined) {
-              scoreEl.textContent = `${item.score} PTS`;
+            const pts = item.score !== undefined ? item.score : item.totalScore;
+            if (scoreEl && pts !== undefined) {
+              scoreEl.textContent = `${pts} PTS`;
             }
           }
         });
@@ -276,8 +277,9 @@
         data.leaderboard.forEach((item) => {
           if (item && item.pin) {
             const scoreEl = document.getElementById(`score-${item.pin}`);
-            if (scoreEl && item.score !== undefined) {
-              scoreEl.textContent = `${item.score} PTS`;
+            const pts = item.score !== undefined ? item.score : item.totalScore;
+            if (scoreEl && pts !== undefined) {
+              scoreEl.textContent = `${pts} PTS`;
             }
           }
         });

@@ -391,6 +391,14 @@
     }
   }
 
+  function getScore(item) {
+    if (!item) return 0;
+    if (typeof item.totalScore === 'number') return item.totalScore;
+    if (typeof item.score === 'number') return item.score;
+    const parsed = parseInt(item.totalScore ?? item.score, 10);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+
   function renderLeaderboard(leaderboard) {
     if (!Array.isArray(leaderboard)) return;
 
@@ -400,19 +408,19 @@
     const p3 = leaderboard[2];
 
     if (elPodiumName1) elPodiumName1.textContent = p1 ? (p1.fullName || `T${p1.terminalNumber}`) : '—';
-    if (elPodiumScore1) elPodiumScore1.textContent = p1 ? `${p1.totalScore} PTS` : '0 PTS';
+    if (elPodiumScore1) elPodiumScore1.textContent = `${getScore(p1)} PTS`;
 
     if (elPodiumName2) elPodiumName2.textContent = p2 ? (p2.fullName || `T${p2.terminalNumber}`) : '—';
-    if (elPodiumScore2) elPodiumScore2.textContent = p2 ? `${p2.totalScore} PTS` : '0 PTS';
+    if (elPodiumScore2) elPodiumScore2.textContent = `${getScore(p2)} PTS`;
 
     if (elPodiumName3) elPodiumName3.textContent = p3 ? (p3.fullName || `T${p3.terminalNumber}`) : '—';
-    if (elPodiumScore3) elPodiumScore3.textContent = p3 ? `${p3.totalScore} PTS` : '0 PTS';
+    if (elPodiumScore3) elPodiumScore3.textContent = `${getScore(p3)} PTS`;
 
     // Roster for Ranks 4+
     if (!elRosterTbody) return;
     elRosterTbody.innerHTML = '';
 
-    const remaining = leaderboard.slice(3, 15); // Show next top ranks
+    const remaining = leaderboard.slice(3); // Show all remaining ranks in scrollable table
     remaining.forEach((item, index) => {
       const tr = document.createElement('tr');
       const padNum = String(item.terminalNumber).padStart(2, '0');
@@ -421,7 +429,7 @@
         <td style="font-weight: 600;">${item.fullName || `Contestant ${item.terminalNumber}`}</td>
         <td style="font-family: var(--font-mono); color: var(--color-primary-light);">T${padNum}</td>
         <td style="color: var(--text-secondary);">${item.department || 'Computer Studies'}</td>
-        <td style="text-align: right; font-weight: 800; font-family: var(--font-mono); color: var(--color-accent);">${item.totalScore} PTS</td>
+        <td style="text-align: right; font-weight: 800; font-family: var(--font-mono); color: var(--color-accent);">${getScore(item)} PTS</td>
       `;
       elRosterTbody.appendChild(tr);
     });
