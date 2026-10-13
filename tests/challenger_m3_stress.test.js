@@ -1741,6 +1741,43 @@ describe('Milestone 3 Empirical Challenge: Procedural Audio & UI Controllers', (
       const tbody = doc.getElementById('stage-roster-tbody');
       assert.strictEqual(tbody.children.length, 2, 'Roster must contain 2 entries for ranks 4 and 5');
     });
+
+    it('4.5 Reading phase timer displays actual allotted time of the staged question', () => {
+      loadProjectorController();
+
+      mockSocket.trigger('game:phase:change', {
+        phase: 'READING',
+        state: {
+          phase: 'READING',
+          currentQuestion: {
+            round: 'difficult',
+            points: 3,
+            question: 'Complex algorithm analysis',
+            timer_seconds: 45,
+            type: 'MCQ'
+          }
+        }
+      });
+
+      assert.strictEqual(doc.getElementById('stage-timer').textContent, '00:45');
+
+      // Test with 30-second question
+      mockSocket.trigger('game:phase:change', {
+        phase: 'READING',
+        state: {
+          phase: 'READING',
+          currentQuestion: {
+            round: 'average',
+            points: 2,
+            question: 'Average question',
+            timer_seconds: 30,
+            type: 'MCQ'
+          }
+        }
+      });
+
+      assert.strictEqual(doc.getElementById('stage-timer').textContent, '00:30');
+    });
   });
 
   // ---------------------------------------------------------------------------

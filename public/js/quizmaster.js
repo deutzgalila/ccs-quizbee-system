@@ -167,6 +167,11 @@
       if (data.gameState.currentQuestion) {
         renderQuestionPreview(data.gameState.currentQuestion);
       }
+      if (data.gameState.phase === 'READING') {
+        const alloted = Number((data.gameState.currentQuestion && (data.gameState.currentQuestion.timer_seconds || data.gameState.currentQuestion.timerSeconds)) ||
+          (data.gameState.timer && data.gameState.timer.durationMs ? Math.round(data.gameState.timer.durationMs / 1000) : 0)) || 15;
+        updateTimerDisplay(alloted);
+      }
     });
 
     // Telemetry updates
@@ -244,6 +249,9 @@
       }
       if (newPhase === 'READING') {
         resetSubmissionsOnGrid();
+        const alloted = Number((data.state && data.state.currentQuestion && (data.state.currentQuestion.timer_seconds || data.state.currentQuestion.timerSeconds)) ||
+          (data.state && data.state.timer && data.state.timer.durationMs ? Math.round(data.state.timer.durationMs / 1000) : 0)) || 15;
+        updateTimerDisplay(alloted);
       }
       socket.emit('qm:telemetry:request');
     });
@@ -439,6 +447,10 @@
         elTimerHint.textContent = 'Contestants are reading prompt — Inputs locked';
         btnStartTimer.disabled = false;
         btnStage.disabled = false;
+        if (currentGameState && currentGameState.currentQuestion) {
+          const alloted = Number(currentGameState.currentQuestion.timer_seconds || currentGameState.currentQuestion.timerSeconds || 15);
+          updateTimerDisplay(alloted);
+        }
         break;
       case 'COUNTDOWN':
         elPhaseBadge.className = 'phase-pill badge-gold';

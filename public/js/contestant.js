@@ -385,6 +385,12 @@
         activeQuestion = { ...activeQuestion, ...state.currentQuestion };
       }
     }
+
+    if (state.phase === 'READING') {
+      const alloted = Number((state.currentQuestion && (state.currentQuestion.timer_seconds || state.currentQuestion.timerSeconds)) ||
+        (state.timer && state.timer.durationMs ? Math.round(state.timer.durationMs / 1000) : 0)) || 15;
+      updateTimer(alloted, alloted * 1000, alloted);
+    }
   }
 
   function handlePhaseTransition(phase) {
@@ -434,6 +440,10 @@
           inputAnswer.style.borderColor = '';
         }
         if (window.QuizAudio) window.QuizAudio.playPhaseChime();
+
+        // In READING phase, reflect the question's allotted time on timer and progress bar
+        const alloted = Number((activeQuestion && (activeQuestion.timer_seconds || activeQuestion.timerSeconds)) || 15);
+        updateTimer(alloted, alloted * 1000, alloted);
         break;
 
       case 'COUNTDOWN':
@@ -553,6 +563,12 @@
         inputAnswer.classList.remove('is-masked');
         inputAnswer.style.borderColor = '';
       }
+    }
+
+    // In READING phase (or during staging), immediately reflect question's allotted time
+    if (currentPhase === 'READING' || currentPhase === 'LOBBY' || !currentPhase) {
+      const alloted = Number(q.timer_seconds || q.timerSeconds || 15);
+      updateTimer(alloted, alloted * 1000, alloted);
     }
   }
 

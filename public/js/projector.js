@@ -151,6 +151,17 @@
     }
 
     setPhase(state.phase);
+
+    if (state.phase === 'READING') {
+      const alloted = Number((state.currentQuestion && (state.currentQuestion.timer_seconds || state.currentQuestion.timerSeconds)) ||
+        (state.timer && state.timer.durationMs ? Math.round(state.timer.durationMs / 1000) : 0)) || 15;
+      updateTimerDisplay(alloted);
+    } else if (state.phase === 'COUNTDOWN' && state.timer) {
+      const remaining = Math.max(0, Math.ceil(state.timer.remainingMs / 1000));
+      updateTimerDisplay(remaining);
+    } else if (['LOCKED', 'REVIEW', 'REVEAL', 'LEADERBOARD'].includes(state.phase)) {
+      updateTimerDisplay(0);
+    }
   }
 
   function setPhase(phase) {
@@ -190,6 +201,10 @@
           elPhasePill.textContent = 'READING PHASE';
         }
         resetOptionCards();
+
+        // In READING phase, reflect the actual allotted time on the staged question/item
+        const allotedSeconds = Number((currentQuestion && (currentQuestion.timer_seconds || currentQuestion.timerSeconds)) || 15);
+        updateTimerDisplay(allotedSeconds);
         break;
 
       case 'COUNTDOWN':
@@ -326,6 +341,12 @@
         elOptionsGrid.classList.remove('hidden');
       } else if (elOptionsGrid) {
         elOptionsGrid.classList.add('hidden');
+      }
+
+      // If in READING phase (or during staging), immediately reflect question's allotted time
+      if (currentPhase === 'READING' || currentPhase === 'LOBBY' || !currentPhase) {
+        const alloted = Number(q.timer_seconds || q.timerSeconds || 15);
+        updateTimerDisplay(alloted);
       }
     }
   }
