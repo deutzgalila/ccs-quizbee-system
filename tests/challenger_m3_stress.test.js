@@ -756,6 +756,7 @@ describe('Milestone 3 Empirical Challenge: Procedural Audio & UI Controllers', (
       doc.register(new MockElement('pre', 'code-snippet', 'hidden'));
       doc.register(new MockElement('code', 'code-content'));
       doc.register(new MockElement('div', 'reading-lock', 'hidden'));
+      doc.register(new MockElement('div', 'contestant-countdown-notice', 'hidden'));
       doc.register(new MockElement('div', 'submission-status', 'hidden'));
 
       doc.register(new MockElement('div', 'mcq-container', 'hidden'));
@@ -936,24 +937,52 @@ describe('Milestone 3 Empirical Challenge: Procedural Audio & UI Controllers', (
     it('2.4 State machine phase reactions and input locking', () => {
       loadContestantController();
 
-      // Trigger game:phase:change to READING
-      mockSocket.trigger('game:phase:change', { phase: 'READING' });
+      // Trigger game:phase:change to READING with a staged question
+      mockSocket.trigger('game:phase:change', {
+        phase: 'READING',
+        state: {
+          phase: 'READING',
+          currentQuestion: { id: 10, question: 'What is polymorphism?', code_snippet: 'class A {}', type: 'MCQ', options: { A: 'A', B: 'B', C: 'C', D: 'D' } }
+        }
+      });
       assert.strictEqual(doc.getElementById('reading-lock').classList.contains('hidden'), false);
       assert.strictEqual(doc.getElementById('btn-opt-a').disabled, true);
+      assert.strictEqual(doc.getElementById('question-text').classList.contains('hidden'), false);
+      assert.strictEqual(doc.getElementById('code-snippet').classList.contains('hidden'), false);
+      assert.strictEqual(doc.getElementById('contestant-countdown-notice').classList.contains('hidden'), true);
 
-      // Trigger game:phase:change to COUNTDOWN
-      mockSocket.trigger('game:phase:change', { phase: 'COUNTDOWN' });
+      // Trigger game:phase:change to COUNTDOWN -> Question prompt & snippet disappear, countdown notice shown
+      mockSocket.trigger('game:phase:change', {
+        phase: 'COUNTDOWN',
+        state: {
+          phase: 'COUNTDOWN',
+          currentQuestion: { id: 10, question: 'What is polymorphism?', code_snippet: 'class A {}', type: 'MCQ', options: { A: 'A', B: 'B', C: 'C', D: 'D' } }
+        }
+      });
       assert.strictEqual(doc.getElementById('reading-lock').classList.contains('hidden'), true);
       assert.strictEqual(doc.getElementById('btn-opt-a').disabled, false);
+      assert.strictEqual(doc.getElementById('question-text').classList.contains('hidden'), true, 'Question text must disappear on COUNTDOWN');
+      assert.strictEqual(doc.getElementById('code-snippet').classList.contains('hidden'), true, 'Code snippet must disappear on COUNTDOWN');
+      assert.strictEqual(doc.getElementById('contestant-countdown-notice').classList.contains('hidden'), false, 'Countdown notice must be visible');
 
       // Trigger game:phase:change to PAUSED
       mockSocket.trigger('game:phase:change', { phase: 'PAUSED' });
       assert.strictEqual(doc.getElementById('btn-opt-a').disabled, true);
 
-      // Trigger game:question:lock
+      // Trigger game:question:lock -> Question reappears, countdown notice hides
+      mockSocket.trigger('game:phase:change', {
+        phase: 'LOCKED',
+        state: {
+          phase: 'LOCKED',
+          currentQuestion: { id: 10, question: 'What is polymorphism?', code_snippet: 'class A {}', type: 'MCQ', options: { A: 'A', B: 'B', C: 'C', D: 'D' } }
+        }
+      });
       mockSocket.trigger('game:question:lock');
       assert.strictEqual(doc.getElementById('btn-opt-a').disabled, true);
       assert.strictEqual(doc.getElementById('submission-status').classList.contains('hidden'), false);
+      assert.strictEqual(doc.getElementById('question-text').classList.contains('hidden'), false, 'Question text must reappear on LOCKED');
+      assert.strictEqual(doc.getElementById('code-snippet').classList.contains('hidden'), false, 'Code snippet must reappear on LOCKED');
+      assert.strictEqual(doc.getElementById('contestant-countdown-notice').classList.contains('hidden'), true);
     });
 
     it('2.5 MCQ submission, duplicate submission prevention, and input locking', () => {

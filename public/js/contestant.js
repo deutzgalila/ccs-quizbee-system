@@ -12,6 +12,7 @@
   let currentPin = null;
   let contestantProfile = null;
   let activeQuestion = null;
+  let currentPhase = 'LOBBY';
   let hasSubmittedCurrent = false;
   let submittedAnswerStatus = 'NONE'; // 'NONE' | 'PENDING' | 'CORRECT' | 'INCORRECT'
   let lastSubmittedAnswer = '';
@@ -47,6 +48,7 @@
   const elCodeSnippet = document.getElementById('code-snippet');
   const elCodeContent = document.getElementById('code-content');
   const elReadingLock = document.getElementById('reading-lock');
+  const elCountdownNotice = document.getElementById('contestant-countdown-notice');
   const elSubmissionStatus = document.getElementById('submission-status');
 
   // MCQ & ID Forms
@@ -386,16 +388,21 @@
   }
 
   function handlePhaseTransition(phase) {
+    currentPhase = phase;
     elPhaseLabel.textContent = `${phase} PHASE`;
 
     switch (phase) {
       case 'LOBBY':
         elReadingLock.classList.add('hidden');
+        if (elCountdownNotice) elCountdownNotice.classList.add('hidden');
         elSubmissionStatus.classList.add('hidden');
         elMcqContainer.classList.add('hidden');
         elIdContainer.classList.add('hidden');
-        elQuestionText.textContent = 'Waiting for Quizmaster to stage next question...';
-        elCodeSnippet.classList.add('hidden');
+        if (elQuestionText) {
+          elQuestionText.classList.remove('hidden');
+          elQuestionText.textContent = 'Waiting for Quizmaster to stage next question...';
+        }
+        if (elCodeSnippet) elCodeSnippet.classList.add('hidden');
         if (elQuestionCard) elQuestionCard.className = 'question-card';
         if (elItemBadge) elItemBadge.classList.add('hidden');
         activeQuestion = null;
@@ -407,7 +414,12 @@
 
       case 'READING':
         elReadingLock.classList.remove('hidden');
+        if (elCountdownNotice) elCountdownNotice.classList.add('hidden');
         elSubmissionStatus.classList.add('hidden');
+        if (elQuestionText) elQuestionText.classList.remove('hidden');
+        if (activeQuestion && activeQuestion.code_snippet && elCodeSnippet) {
+          elCodeSnippet.classList.remove('hidden');
+        }
         if (elQuestionCard) elQuestionCard.className = 'question-card';
         lockInputs();
         hasSubmittedCurrent = false;
@@ -426,6 +438,11 @@
 
       case 'COUNTDOWN':
         elReadingLock.classList.add('hidden');
+        // Question prompt and code snippet disappear from contestant terminal when timer starts
+        if (elQuestionText) elQuestionText.classList.add('hidden');
+        if (elCodeSnippet) elCodeSnippet.classList.add('hidden');
+        if (elCountdownNotice) elCountdownNotice.classList.remove('hidden');
+
         if (!hasSubmittedCurrent) {
           unlockInputs();
         } else {
@@ -440,11 +457,21 @@
       case 'LOCKED':
         lockInputs();
         elReadingLock.classList.add('hidden');
+        if (elCountdownNotice) elCountdownNotice.classList.add('hidden');
+        if (elQuestionText) elQuestionText.classList.remove('hidden');
+        if (activeQuestion && activeQuestion.code_snippet && elCodeSnippet) {
+          elCodeSnippet.classList.remove('hidden');
+        }
         break;
 
       case 'REVEAL':
       case 'LEADERBOARD':
         lockInputs();
+        if (elCountdownNotice) elCountdownNotice.classList.add('hidden');
+        if (elQuestionText) elQuestionText.classList.remove('hidden');
+        if (activeQuestion && activeQuestion.code_snippet && elCodeSnippet) {
+          elCodeSnippet.classList.remove('hidden');
+        }
         break;
     }
   }
@@ -479,11 +506,20 @@
     elPointBadge.textContent = `${q.points !== undefined ? q.points : 1} POINTS`;
     elQuestionText.textContent = q.question || q.question_text || '';
 
-    if (q.code_snippet) {
-      elCodeSnippet.classList.remove('hidden');
-      elCodeContent.textContent = q.code_snippet;
+    // If already in COUNTDOWN phase, hide question text & snippet and show countdown notice
+    if (currentPhase === 'COUNTDOWN') {
+      if (elQuestionText) elQuestionText.classList.add('hidden');
+      if (elCodeSnippet) elCodeSnippet.classList.add('hidden');
+      if (elCountdownNotice) elCountdownNotice.classList.remove('hidden');
     } else {
-      elCodeSnippet.classList.add('hidden');
+      if (elQuestionText) elQuestionText.classList.remove('hidden');
+      if (elCountdownNotice) elCountdownNotice.classList.add('hidden');
+      if (q.code_snippet) {
+        elCodeSnippet.classList.remove('hidden');
+        elCodeContent.textContent = q.code_snippet;
+      } else {
+        elCodeSnippet.classList.add('hidden');
+      }
     }
 
     const isMcq = q.type === 'MCQ' || q.question_type === 'MCQ';
