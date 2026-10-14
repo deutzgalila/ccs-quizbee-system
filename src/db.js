@@ -335,7 +335,11 @@ function prepareStatements() {
       INSERT INTO CHEAT_LOGS (contestant_id, incident_type, timestamp, details)
       VALUES (?, ?, ?, ?)
     `),
-    getIncidentsForContestant: db.prepare('SELECT * FROM CHEAT_LOGS WHERE contestant_id = ? ORDER BY timestamp DESC, id DESC'),
+    getIncidentsForContestant: db.prepare(`
+      SELECT logs.*, c.full_name AS fullName, c.pin, c.terminal_number AS terminalNumber
+      FROM CHEAT_LOGS logs JOIN CONTESTANTS c ON c.id = logs.contestant_id
+      WHERE logs.contestant_id = ? ORDER BY logs.timestamp DESC, logs.id DESC
+    `),
 
     // Isolation auto-stubs for tests executing against unseeded temporary DBs
     ensureStubRound: db.prepare(`
@@ -580,6 +584,11 @@ function getContestantByPin(pin) {
   return stmts.getContestantByPin.get(String(pin)) || null;
 }
 
+function updateContestantName(pin, fullName) {
+  db.prepare('UPDATE CONTESTANTS SET full_name = ? WHERE pin = ?').run(fullName, String(pin));
+  return getContestantByPin(pin);
+}
+
 /**
  * Get contestant by ID
  * @param {number} id
@@ -735,6 +744,7 @@ module.exports = {
   getIncidentLogs,
   getIncidentsForContestant: getIncidentLogs,
   getContestantByPin,
+  updateContestantName,
   getContestantById,
   getAllContestants,
   updateContestantConnection,

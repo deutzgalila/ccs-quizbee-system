@@ -176,6 +176,11 @@ class TelemetryManager extends EventEmitter {
     term.connectedAt = Date.now();
     term.lastSeenAt = Date.now();
 
+    if (this.db && typeof this.db.getContestantByPin === 'function') {
+      const contestant = this.db.getContestantByPin(pin);
+      if (contestant && contestant.full_name) term.fullName = contestant.full_name;
+    }
+
     if (this.db && typeof this.db.updateContestantConnection === 'function') {
       try {
         this.db.updateContestantConnection(pin, true, socketId);
@@ -325,7 +330,10 @@ class TelemetryManager extends EventEmitter {
         let contestantId = null;
         if (typeof this.db.getContestantByPin === 'function') {
           const contestant = this.db.getContestantByPin(pin);
-          if (contestant) contestantId = contestant.id;
+          if (contestant) {
+            contestantId = contestant.id;
+            if (contestant.full_name) term.fullName = contestant.full_name;
+          }
         }
         if (!contestantId) {
           contestantId = term.terminalNumber;
@@ -346,6 +354,9 @@ class TelemetryManager extends EventEmitter {
     }
 
     const incidentRecord = {
+      fullName: term.fullName,
+      pin,
+      terminalNumber: term.terminalNumber,
       type: rawType,
       incidentType: rawType,
       timestamp: now,

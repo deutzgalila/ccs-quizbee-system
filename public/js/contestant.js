@@ -23,6 +23,8 @@
   // DOM Elements - Login
   const sectionLogin = document.getElementById('login-section');
   const inputPin = document.getElementById('pin-input');
+  const inputName = document.getElementById('name-input');
+  const loginForm = document.getElementById('contestant-login-form');
   const btnLogin = document.getElementById('btn-login');
   const elLoginError = document.getElementById('login-error');
   const keypadButtons = document.querySelectorAll('.keypad-btn');
@@ -78,6 +80,7 @@
 
     // Check for saved session in localStorage
     const savedPin = localStorage.getItem('quizbee_pin');
+    inputName.value = localStorage.getItem('quizbee_name') || '';
     if (savedPin && inputPin) {
       inputPin.value = savedPin;
     }
@@ -112,31 +115,27 @@
           inputPin.value += key;
         }
 
-        if (inputPin.value.length === 4) {
-          attemptLogin();
-        }
       });
     });
   }
 
   function setupAuthEvents() {
-    if (inputPin) {
-      inputPin.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          attemptLogin();
-        }
-      });
-    }
-
-    if (btnLogin) {
-      btnLogin.addEventListener('click', attemptLogin);
-    }
+    loginForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      attemptLogin();
+    });
   }
 
   // Authenticate
   function attemptLogin() {
     const pin = inputPin.value.trim();
-    if (!pin || pin.length < 4) {
+    const fullName = inputName.value.trim().replace(/\s+/g, ' ');
+    if (!fullName || fullName.length > 100) {
+      showLoginError('Please enter your name (1–100 characters).');
+      inputName.focus();
+      return;
+    }
+    if (!/^\d{4}$/.test(pin)) {
       showLoginError('Please enter a valid 4-digit PIN (1001–1060).');
       return;
     }
@@ -149,7 +148,7 @@
       return;
     }
 
-    socket.emit('contestant:auth', { pin }, (res) => {
+    socket.emit('contestant:auth', { pin, fullName }, (res) => {
       handleAuthResponse(res, pin);
     });
   }
@@ -159,6 +158,7 @@
       currentPin = pin;
       contestantProfile = res.contestant || res || {};
       localStorage.setItem('quizbee_pin', pin);
+      localStorage.setItem('quizbee_name', contestantProfile.fullName || '');
 
       hideLoginError();
       sectionLogin.classList.add('hidden');
@@ -231,7 +231,7 @@
         }
       }
     } else {
-      showLoginError(res?.error === 'INVALID_PIN' ? 'Invalid PIN. Station not found.' : 'Authentication failed.');
+      showLoginError(res?.message || (res?.error === 'INVALID_PIN' ? 'Invalid PIN. Station not found.' : 'Authentication failed.'));
     }
   }
 
@@ -260,7 +260,8 @@
 
       // Auto-reconnect if PIN is stored
       const savedPin = localStorage.getItem('quizbee_pin');
-      if (savedPin) {
+      const savedName = localStorage.getItem('quizbee_name');
+      if (savedPin && savedName) {
         socket.emit('contestant:auth', { pin: savedPin }, (res) => {
           handleAuthResponse(res, savedPin);
         });
@@ -282,6 +283,7 @@
     // Evicted if duplicate login
     socket.on('contestant:kicked', (data) => {
       localStorage.removeItem('quizbee_pin');
+      localStorage.removeItem('quizbee_name');
       alert(data.message || 'Logged in from another workstation.');
       location.reload();
     });
@@ -545,7 +547,13 @@
       elMcqContainer.classList.remove('hidden');
 
       const opts = typeof q.options === 'string' ? JSON.parse(q.options) : (q.options || {});
+      const displayOrder = q.display_order || ['A', 'B', 'C', 'D'];
       ['A', 'B', 'C', 'D'].forEach((letter) => {
+        const btn = document.getElementById(`opt-${letter.toLowerCase()}`);
+        if (btn) {
+          const slotIndex = displayOrder.indexOf(letter);
+          btn.style.order = slotIndex !== -1 ? (slotIndex + 1) : 0;
+        }
         const textEl = document.getElementById(`text-opt-${letter.toLowerCase()}`);
         if (textEl) textEl.textContent = opts[letter] || `Option ${letter}`;
       });
@@ -700,8 +708,15 @@
 
   function handleAnswerReveal(data) {
     if (!data) return;
+    if (data.totalScore !== undefined) {
+      elCurrentScore.textContent = `${data.totalScore} PTS`;
+      if (contestantProfile) contestantProfile.totalScore = data.totalScore;
+      if (currentSubmission) currentSubmission.totalScore = data.totalScore;
+    }
     const officialAnswer = (data.correctAnswer || '').trim();
     const correctUpper = officialAnswer.toUpperCase();
+    const answerLabel = data.correctAnswerText
+      ? `${data.correctAnswerText} (Option ${officialAnswer})` : officialAnswer;
 
     // Release stealth disguise on reveal
     if (elMcqContainer) elMcqContainer.classList.remove('is-locked');
@@ -739,7 +754,7 @@
         if (elQuestionCard) elQuestionCard.className = 'question-card status-correct';
         if (!isMcq && inputAnswer) inputAnswer.style.borderColor = 'var(--color-success)';
         const pts = (currentSubmission && currentSubmission.pointsAwarded) || (activeQuestion ? activeQuestion.points : 1);
-        showSubmissionStatus(`✓ Correct! Official Answer: "${officialAnswer}" • +${pts} Points Awarded`);
+        showSubmissionStatus(`✓ Correct! Official Answer: "${answerLabel}" • +${pts} Points Awarded`);
         if (window.QuizAudio) window.QuizAudio.playCorrect();
         if (currentSubmission && currentSubmission.totalScore !== undefined) {
           elCurrentScore.textContent = `${currentSubmission.totalScore} PTS`;
@@ -748,18 +763,18 @@
       } else if (isPending) {
         submittedAnswerStatus = 'PENDING';
         if (elQuestionCard) elQuestionCard.className = 'question-card status-pending';
-        showSubmissionStatus(`Official Answer: "${officialAnswer}" • Your answer ("${contestantAnswer}") is under Judge Review`);
+        showSubmissionStatus(`Official Answer: "${answerLabel}" • Your answer ("${contestantAnswer}") is under Judge Review`);
       } else {
         submittedAnswerStatus = 'INCORRECT';
         if (elQuestionCard) elQuestionCard.className = 'question-card status-incorrect';
         if (!isMcq && inputAnswer) inputAnswer.style.borderColor = 'var(--color-danger)';
-        showSubmissionStatus(`✗ Incorrect. Official Answer: "${officialAnswer}" • Your answer: "${contestantAnswer}"`);
+        showSubmissionStatus(`✗ Incorrect. Official Answer: "${answerLabel}" • Your answer: "${contestantAnswer}"`);
         if (window.QuizAudio) window.QuizAudio.playIncorrect();
       }
     } else {
       submittedAnswerStatus = 'INCORRECT';
       if (elQuestionCard) elQuestionCard.className = 'question-card status-incorrect';
-      showSubmissionStatus(`✗ Official Answer: "${officialAnswer}" • No submission recorded.`);
+      showSubmissionStatus(`✗ Official Answer: "${answerLabel}" • No submission recorded.`);
       if (window.QuizAudio) window.QuizAudio.playIncorrect();
     }
   }

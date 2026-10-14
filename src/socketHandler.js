@@ -12,7 +12,8 @@
  * - Judge dispute review queue and real-time score recalculation
  */
 
-const { TIMING } = require('./config');
+const { TIMING, SHUFFLE_CONFIG } = require('./config');
+const { getContestantDisplayOrder } = require('./shuffleEngine');
 const TelemetryManager = require('./telemetryManager');
 
 class SocketHandler {
@@ -37,6 +38,8 @@ class SocketHandler {
       this.options = opts;
       this.telemetryManager = new TelemetryManager({ db: this.db, ...opts });
     }
+
+    this.shuffleConfig = Object.freeze({ ...SHUFFLE_CONFIG, ...this.options.shuffleConfig });
 
     this.graceWindowMs = this.options.graceWindowMs || TIMING?.GRACE_WINDOW_MS || 300;
 
@@ -75,7 +78,7 @@ class SocketHandler {
         prevPhase,
         newPhase,
         autoExpired: !!autoExpired,
-        state
+        state: this._canonicalGameState(state)
       });
 
       // Synchronize latest telemetry snapshot with Quizmaster
@@ -87,17 +90,26 @@ class SocketHandler {
         prevPhase,
         newPhase,
         autoExpired: !!autoExpired,
-        state
+        state: this._canonicalGameState(state)
       });
 
-      // 3. Broadcast sanitized state to Contestants & Projector
+      // 3. Keep projector positions canonical; personalize contestant positions
       const sanitizedState = this._sanitizeGameState(state);
-      this.io.to('room:contestants').to('room:projector').emit('game:phase:change', {
+      this.io.to('room:projector').emit('game:phase:change', {
         prevPhase,
         newPhase,
         autoExpired: !!autoExpired,
         state: sanitizedState
       });
+
+      for (const socket of this.io.sockets.sockets.values()) {
+        if (socket.data?.role === 'CONTESTANT' && socket.data.authenticated && socket.rooms.has('room:contestants')) {
+          socket.emit('game:phase:change', {
+            prevPhase, newPhase, autoExpired: !!autoExpired,
+            state: this._sanitizeGameStateForContestant(state, socket.data.contestantId)
+          });
+        }
+      }
 
       // Phase-specific dispatch
       if (newPhase === 'LOCKED') {
@@ -164,6 +176,29 @@ class SocketHandler {
       };
     }
 
+    if (sanitized.currentQuestion?.question_type === 'MCQ') {
+      sanitized.currentQuestion.display_order = ['A', 'B', 'C', 'D'];
+    }
+    return sanitized;
+  }
+
+  // Administrative clients keep full question data and canonical positions.
+  _canonicalGameState(state) {
+    if (!state?.currentQuestion || state.currentQuestion.question_type !== 'MCQ') return state;
+    return {
+      ...state,
+      currentQuestion: { ...state.currentQuestion, display_order: ['A', 'B', 'C', 'D'] }
+    };
+  }
+
+  _sanitizeGameStateForContestant(state, contestantId) {
+    const sanitized = this._sanitizeGameState(state);
+    if (sanitized?.currentQuestion?.question_type === 'MCQ' && this.shuffleConfig.ENABLED &&
+        this.shuffleConfig.MODE === 'LABEL_PRESERVING_POSITION') {
+      sanitized.currentQuestion.display_order = getContestantDisplayOrder(
+        sanitized.currentQuestion, contestantId, this.shuffleConfig.SEED_SALT
+      );
+    }
     return sanitized;
   }
 
@@ -223,7 +258,7 @@ class SocketHandler {
         const snapshot = this.telemetryManager.getSnapshot();
         const response = {
           success: true,
-          gameState: this.engine.getState(),
+          gameState: this._canonicalGameState(this.engine.getState()),
           telemetryGrid: snapshot.terminals,
           summary: snapshot.summary
         };
@@ -284,7 +319,7 @@ class SocketHandler {
         const pending = this._formatPendingDisputes(pendingRaw);
         const response = {
           success: true,
-          gameState: this.engine.getState(),
+          gameState: this._canonicalGameState(this.engine.getState()),
           pendingDisputes: pending
         };
         if (callback) callback(response);
@@ -303,6 +338,9 @@ class SocketHandler {
       });
 
       // 5. Contestant Authentication & Session Re-attachment
+      socket.on('contestant:join', (payload, callback) => {
+        this._handleContestantAuth(socket, payload, callback);
+      });
       socket.on('contestant:auth', (payload, callback) => {
         this._handleContestantAuth(socket, payload, callback);
       });
@@ -347,13 +385,25 @@ class SocketHandler {
     }
 
     const pin = String(payload.pin).trim();
-    const contestant = this.db.getContestantByPin(pin);
+    let contestant = this.db.getContestantByPin(pin);
 
     if (!contestant) {
       const errRes = { success: false, error: 'INVALID_PIN' };
       ack(errRes);
       socket.emit('contestant:auth:ack', errRes);
       return;
+    }
+
+    if (payload.fullName !== undefined) {
+      const fullName = typeof payload.fullName === 'string'
+        ? payload.fullName.trim().replace(/\s+/g, ' ') : '';
+      if (!fullName || fullName.length > 100) {
+        const errRes = { success: false, error: 'INVALID_NAME', message: 'Please enter your name (1–100 characters).' };
+        ack(errRes);
+        socket.emit('contestant:auth:ack', errRes);
+        return;
+      }
+      contestant = this.db.updateContestantName(pin, fullName);
     }
 
     // 1. Authoritative Duplicate Session Eviction Protocol
@@ -394,7 +444,7 @@ class SocketHandler {
 
     // 3. Session Rehydration
     const engineState = this.engine.getState();
-    const sanitizedState = this._sanitizeGameState(engineState);
+    const sanitizedState = this._sanitizeGameStateForContestant(engineState, contestant.id);
 
     let submittedAnswer = null;
     let hasSubmitted = false;
@@ -443,6 +493,10 @@ class SocketHandler {
     ack(restorePayload);
     socket.emit('contestant:session:restore', restorePayload);
     socket.emit('contestant:auth:ack', restorePayload);
+
+    if (payload.fullName !== undefined) {
+      this.io.emit('leaderboard:update', { leaderboard: this.db.getLeaderboard(engineState.roundId) });
+    }
 
     // Broadcast presence update to Quizmaster
     this.io.to('room:quizmaster').emit('qm:telemetry:connection', {

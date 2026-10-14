@@ -45,6 +45,30 @@ input, textarea {
   border-radius: var(--radius-xl);
 }
 
+.login-field-label {
+  display: block;
+  text-align: left;
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.name-input-field {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.85rem 1rem;
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+.name-input-field:focus {
+  outline: 2px solid var(--color-rose);
+  outline-offset: 2px;
+}
+
 .pin-display-wrapper {
   margin: 1.25rem 0;
 }

@@ -59,16 +59,21 @@
     <section id="login-section" class="login-container">
       <div class="card login-card" style="padding: 2.5rem 2rem;">
         <span class="badge badge-maroon" style="margin-bottom: 1rem;">Workstation Authentication</span>
-        <h1 style="font-size: 1.75rem; font-weight: 800; margin-bottom: 0.5rem; letter-spacing: -0.02em; color: var(--text-primary);">Enter Terminal PIN</h1>
-        <p style="font-size: 0.875rem; color: #828290; margin-bottom: 1.5rem;">Enter the 4-digit PIN assigned to your workstation desk (1001&ndash;1060).</p>
+        <h1 style="font-size: 1.75rem; font-weight: 800; margin-bottom: 0.5rem; letter-spacing: -0.02em; color: var(--text-primary);">Contestant Sign In</h1>
+        <p style="font-size: 0.875rem; color: #828290; margin-bottom: 1.5rem;">Enter your name as it should appear on the leaderboard and your workstation PIN (1001&ndash;1060).</p>
 
+        <form id="contestant-login-form">
+        <label for="name-input" class="login-field-label">Contestant name</label>
+        <input type="text" id="name-input" class="name-input-field" placeholder="Enter your full name Eg:(Juan Dela Cruz)" maxlength="100" autocomplete="name" required autofocus>
         <div class="pin-display-wrapper">
-          <input type="text" id="pin-input" class="pin-input-field" placeholder="----" maxlength="4" autocomplete="off" autofocus>
+          <label for="pin-input" class="login-field-label">Terminal PIN</label>
+          <input type="text" id="pin-input" class="pin-input-field" placeholder="----" maxlength="4" inputmode="numeric" pattern="[0-9]{4}" autocomplete="off" required>
         </div>
 
-        <div id="login-error" class="alert alert-danger hidden" style="margin-bottom: 1rem; color: #f43f5e; font-size: 0.875rem;"></div>
+        <div id="login-error" role="alert" class="alert alert-danger hidden" style="margin-bottom: 1rem; color: #f43f5e; font-size: 0.875rem;"></div>
 
-        <button id="btn-login" class="btn btn-primary btn-lg" style="width: 100%; margin-bottom: 1.25rem;">Connect &amp; Lock Screen</button>
+        <button type="submit" id="btn-login" class="btn btn-primary btn-lg" style="width: 100%; margin-bottom: 1.25rem;">Connect &amp; Lock Screen</button>
+        </form>
 
         <!-- On-Screen Numeric Keypad -->
         <div class="keypad-grid">
