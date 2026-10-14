@@ -447,11 +447,12 @@
       const padNum = String(item.terminalNumber).padStart(2, '0');
       tr.innerHTML = `
         <td style="font-weight: 800; font-family: var(--font-mono); color: var(--text-muted);">${index + 4}</td>
-        <td style="font-weight: 600;">${item.fullName || `Contestant ${item.terminalNumber}`}</td>
+        <td class="roster-contestant-name" style="font-weight: 600;"></td>
         <td style="font-family: var(--font-mono); color: var(--color-primary-light);">T${padNum}</td>
         <td style="color: var(--text-secondary);">${item.department || 'Computer Studies'}</td>
         <td style="text-align: right; font-weight: 800; font-family: var(--font-mono); color: var(--color-accent);">${getScore(item)} PTS</td>
       `;
+      tr.querySelector('.roster-contestant-name').textContent = item.fullName || `Contestant ${item.terminalNumber}`;
       elRosterTbody.appendChild(tr);
     });
   }
