@@ -12,7 +12,8 @@
  * - Judge dispute review queue and real-time score recalculation
  */
 
-const { TIMING } = require('./config');
+const { TIMING, SHUFFLE_CONFIG } = require('./config');
+const shuffleEngine = require('./shuffleEngine');
 const TelemetryManager = require('./telemetryManager');
 
 class SocketHandler {
@@ -37,6 +38,8 @@ class SocketHandler {
       this.options = opts;
       this.telemetryManager = new TelemetryManager({ db: this.db, ...opts });
     }
+
+    this.shuffleConfig = Object.freeze({ ...SHUFFLE_CONFIG, ...this.options.shuffleConfig });
 
     this.graceWindowMs = this.options.graceWindowMs || TIMING?.GRACE_WINDOW_MS || 300;
 
@@ -90,14 +93,21 @@ class SocketHandler {
         state
       });
 
-      // 3. Broadcast sanitized state to Contestants & Projector
+      // 3. Preserve canonical projector options; personalize contestant options
       const sanitizedState = this._sanitizeGameState(state);
-      this.io.to('room:contestants').to('room:projector').emit('game:phase:change', {
+      this.io.to('room:projector').emit('game:phase:change', {
         prevPhase,
         newPhase,
         autoExpired: !!autoExpired,
         state: sanitizedState
       });
+
+      for (const socket of this._contestantSockets()) {
+        socket.emit('game:phase:change', {
+          prevPhase, newPhase, autoExpired: !!autoExpired,
+          state: this._sanitizeGameStateForContestant(state, socket.data.contestantId)
+        });
+      }
 
       // Phase-specific dispatch
       if (newPhase === 'LOCKED') {
@@ -107,11 +117,14 @@ class SocketHandler {
           reason: autoExpired ? 'TIMEOUT' : 'FORCE_LOCK'
         });
       } else if (newPhase === 'REVEAL' && state.currentQuestion) {
-        this.io.emit('game:answer:reveal', {
+        this.io.to('room:projector').to('room:quizmaster').to('room:judges').emit('game:answer:reveal', {
           questionId: state.currentQuestion.id,
           correctAnswer: state.currentQuestion.correct_answer,
           explanation: state.currentQuestion.explanation || ''
         });
+        for (const socket of this._contestantSockets()) {
+          socket.emit('game:answer:reveal', this._contestantReveal(state.currentQuestion, socket.data.contestantId));
+        }
       } else if (newPhase === 'LEADERBOARD') {
         const leaderboard = this.db.getLeaderboard(state.roundId);
         this.io.emit('game:leaderboard', {
@@ -165,6 +178,51 @@ class SocketHandler {
     }
 
     return sanitized;
+  }
+
+  *_contestantSockets() {
+    for (const socket of this.io.sockets.sockets.values()) {
+      if (socket.data?.role === 'CONTESTANT' && socket.data.authenticated && socket.rooms.has('room:contestants')) {
+        yield socket;
+      }
+    }
+  }
+
+  _shuffleEnabled(question) {
+    return this.shuffleConfig.ENABLED && this.shuffleConfig.MODE === 'PER_CONTESTANT' &&
+      question?.question_type === 'MCQ';
+  }
+
+  _mappingQuestion(question) {
+    return { ...question, options: typeof question.options === 'string' ? JSON.parse(question.options) : question.options };
+  }
+
+  _sanitizeGameStateForContestant(state, contestantId) {
+    const sanitized = this._sanitizeGameState(state);
+    if (this._shuffleEnabled(state?.currentQuestion)) {
+      sanitized.currentQuestion.options = shuffleEngine.getContestantOptionMapping(
+        this._mappingQuestion(state.currentQuestion), contestantId, this.shuffleConfig.SEED_SALT
+      ).shuffledOptions;
+    }
+    return sanitized;
+  }
+
+  _displayedAnswer(question, contestantId, answer) {
+    return this._shuffleEnabled(question)
+      ? shuffleEngine.toDisplayedAnswer(this._mappingQuestion(question), contestantId, answer, this.shuffleConfig.SEED_SALT)
+      : answer;
+  }
+
+  _contestantReveal(question, contestantId) {
+    const q = this._mappingQuestion(question);
+    const contestant = this.db.getContestantById(contestantId);
+    return {
+      totalScore: contestant?.total_score,
+      questionId: q.id,
+      correctAnswer: this._displayedAnswer(q, contestantId, q.correct_answer),
+      correctAnswerText: q.question_type === 'MCQ' ? (q.options?.[q.correct_answer] || '') : '',
+      explanation: q.explanation || ''
+    };
   }
 
   /**
@@ -303,6 +361,9 @@ class SocketHandler {
       });
 
       // 5. Contestant Authentication & Session Re-attachment
+      socket.on('contestant:join', (payload, callback) => {
+        this._handleContestantAuth(socket, payload, callback);
+      });
       socket.on('contestant:auth', (payload, callback) => {
         this._handleContestantAuth(socket, payload, callback);
       });
@@ -384,6 +445,13 @@ class SocketHandler {
       this.socketToPin.delete(existingSocket.id);
     }
 
+    // Remove previous role subscriptions before granting a contestant session.
+    for (const room of [...socket.rooms]) {
+      if (room.startsWith('room:') || room.startsWith('contestant:')) socket.leave(room);
+    }
+    const previousPin = this.socketToPin.get(socket.id);
+    if (previousPin && previousPin !== pin) this.activeSocketsByPin.delete(previousPin);
+
     // 2. Bind new socket to workstation session
     this.activeSocketsByPin.set(pin, socket);
     this.socketToPin.set(socket.id, pin);
@@ -406,7 +474,9 @@ class SocketHandler {
 
     // 3. Session Rehydration
     const engineState = this.engine.getState();
-    const sanitizedState = this._sanitizeGameState(engineState);
+    const sanitizedState = this._sanitizeGameStateForContestant(engineState, contestant.id);
+    const hideResult = this._shuffleEnabled(engineState.currentQuestion) &&
+      !['REVEAL', 'LEADERBOARD'].includes(engineState.phase);
 
     let submittedAnswer = null;
     let hasSubmitted = false;
@@ -420,7 +490,7 @@ class SocketHandler {
 
       if (priorSub) {
         hasSubmitted = true;
-        submittedAnswer = priorSub.submitted_answer;
+        submittedAnswer = this._displayedAnswer(engineState.currentQuestion, contestant.id, priorSub.submitted_answer);
         judgeStatus = priorSub.judge_status;
         awardedPoints = priorSub.awarded_points;
       }
@@ -435,26 +505,29 @@ class SocketHandler {
         studentId: contestant.student_id,
         fullName: contestant.full_name,
         department: contestant.department_or_section,
-        totalScore: contestant.total_score
+        totalScore: hideResult ? contestant.total_score - awardedPoints : contestant.total_score
       },
       gameState: sanitizedState,
       submissionStatus: {
         hasSubmitted,
         submittedAnswer,
         judgeStatus,
-        awardedPoints
+        awardedPoints: hideResult ? null : awardedPoints
       },
       session: {
         hasSubmitted,
         submittedAnswer,
         judgeStatus,
-        awardedPoints
+        awardedPoints: hideResult ? null : awardedPoints
       }
     };
 
     ack(restorePayload);
     socket.emit('contestant:session:restore', restorePayload);
     socket.emit('contestant:auth:ack', restorePayload);
+    if (engineState.currentQuestion && ['REVEAL', 'LEADERBOARD'].includes(engineState.phase)) {
+      socket.emit('game:answer:reveal', this._contestantReveal(engineState.currentQuestion, contestant.id));
+    }
 
     if (payload.fullName !== undefined) {
       this.io.emit('leaderboard:update', { leaderboard: this.db.getLeaderboard(engineState.roundId) });
@@ -585,6 +658,7 @@ class SocketHandler {
 
     // 3. Evaluate Submission
     const rawAnswer = String(payload.answer ?? '').trim();
+    let canonicalAnswer = rawAnswer;
     let isCorrect = 0;
     let judgeStatus = 'AUTO';
     let awardedPoints = 0;
@@ -592,7 +666,10 @@ class SocketHandler {
     const qType = currentQ.question_type || currentQ.type || 'MCQ';
 
     if (qType === 'MCQ') {
-      const userClean = rawAnswer.toUpperCase();
+      canonicalAnswer = this._shuffleEnabled(currentQ)
+        ? shuffleEngine.toCanonicalAnswer(this._mappingQuestion(currentQ), contestant.id, rawAnswer.toUpperCase(), this.shuffleConfig.SEED_SALT)
+        : rawAnswer;
+      const userClean = canonicalAnswer.toUpperCase();
       const correctClean = String(currentQ.correct_answer || currentQ.correctAnswer || '').trim().toUpperCase();
       isCorrect = userClean !== '' && userClean === correctClean ? 1 : 0;
       awardedPoints = isCorrect ? (currentQ.points || 1) : 0;
@@ -639,7 +716,7 @@ class SocketHandler {
       savedSub = this.db.saveSubmission(
         contestant.id,
         currentQ.id,
-        rawAnswer,
+        canonicalAnswer,
         serverTimestamp,
         isCorrect,
         judgeStatus,
@@ -674,9 +751,9 @@ class SocketHandler {
       questionId: currentQ.id,
       submittedAnswer: rawAnswer,
       serverTimeMs: serverTimestamp,
-      pointsAwarded: awardedPoints,
+      pointsAwarded: this._shuffleEnabled(currentQ) ? null : awardedPoints,
       judgeStatus,
-      totalScore: updatedContestant ? updatedContestant.total_score : contestant.total_score
+      totalScore: this._shuffleEnabled(currentQ) ? contestant.total_score : updatedContestant ? updatedContestant.total_score : contestant.total_score
     };
 
     ack(ackPayload);
