@@ -75,7 +75,7 @@ const TERMINAL_CONFIG = Object.freeze({
 
 const SHUFFLE_CONFIG = Object.freeze({
   ENABLED: process.env.ENABLE_OPTION_SHUFFLE !== 'false',
-  MODE: 'PER_CONTESTANT',
+  MODE: 'LABEL_PRESERVING_POSITION',
   SEED_SALT: process.env.SHUFFLE_SEED_SALT || 'OLFU_QUIZBEE_ITPM311'
 });
 
