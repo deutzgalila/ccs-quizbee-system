@@ -11,25 +11,32 @@ const os = require('os');
  * @returns {string} Detected IPv4 address or '127.0.0.1' fallback
  */
 function getLocalIpAddress() {
-  const interfaces = os.networkInterfaces();
-  const candidates = [];
+  if (process.env.HOST) {
+    return process.env.HOST;
+  }
+  try {
+    const interfaces = os.networkInterfaces();
+    const candidates = [];
 
-  for (const name of Object.keys(interfaces)) {
-    const netList = interfaces[name] || [];
-    for (const net of netList) {
-      const family = typeof net.family === 'string' ? net.family : `IPv${net.family}`;
-      if (family === 'IPv4' && !net.internal) {
-        // Prioritize wlan/eth/en/wl interfaces
-        const isLan = net.address.startsWith('192.168.') ||
-                      net.address.startsWith('10.') ||
-                      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(net.address);
-        candidates.push({ address: net.address, isLan, interface: name });
+    for (const name of Object.keys(interfaces || {})) {
+      const netList = interfaces[name] || [];
+      for (const net of netList) {
+        const family = typeof net.family === 'string' ? net.family : `IPv${net.family}`;
+        if (family === 'IPv4' && !net.internal) {
+          // Prioritize wlan/eth/en/wl interfaces
+          const isLan = net.address.startsWith('192.168.') ||
+                        net.address.startsWith('10.') ||
+                        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(net.address);
+          candidates.push({ address: net.address, isLan, interface: name });
+        }
       }
     }
-  }
 
-  const preferred = candidates.find(c => c.isLan) || candidates[0];
-  return preferred ? preferred.address : '127.0.0.1';
+    const preferred = candidates.find(c => c.isLan) || candidates[0];
+    return preferred ? preferred.address : '127.0.0.1';
+  } catch (_err) {
+    return '127.0.0.1';
+  }
 }
 
 const PORT = parseInt(process.env.PORT, 10) || 3000;
