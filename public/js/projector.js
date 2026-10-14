@@ -445,14 +445,16 @@
     remaining.forEach((item, index) => {
       const tr = document.createElement('tr');
       const padNum = String(item.terminalNumber).padStart(2, '0');
+      const contestantName = item.fullName || `Contestant ${item.terminalNumber}`;
       tr.innerHTML = `
         <td style="font-weight: 800; font-family: var(--font-mono); color: var(--text-muted);">${index + 4}</td>
-        <td class="roster-contestant-name" style="font-weight: 600;"></td>
+        <td class="roster-contestant-name" style="font-weight: 600;">${contestantName}</td>
         <td style="font-family: var(--font-mono); color: var(--color-primary-light);">T${padNum}</td>
         <td style="color: var(--text-secondary);">${item.department || 'Computer Studies'}</td>
         <td style="text-align: right; font-weight: 800; font-family: var(--font-mono); color: var(--color-accent);">${getScore(item)} PTS</td>
       `;
-      tr.querySelector('.roster-contestant-name').textContent = item.fullName || `Contestant ${item.terminalNumber}`;
+      const nameEl = tr.querySelector && tr.querySelector('.roster-contestant-name');
+      if (nameEl) nameEl.textContent = contestantName;
       elRosterTbody.appendChild(tr);
     });
   }

@@ -80,7 +80,9 @@
 
     // Check for saved session in localStorage
     const savedPin = localStorage.getItem('quizbee_pin');
-    inputName.value = localStorage.getItem('quizbee_name') || '';
+    if (inputName) {
+      inputName.value = localStorage.getItem('quizbee_name') || '';
+    }
     if (savedPin && inputPin) {
       inputPin.value = savedPin;
     }
@@ -115,22 +117,43 @@
           inputPin.value += key;
         }
 
+        if (inputPin.value.length === 4) {
+          if (!inputName || (inputName.value && inputName.value.trim().length > 0)) {
+            attemptLogin();
+          }
+        }
       });
     });
   }
 
   function setupAuthEvents() {
-    loginForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      attemptLogin();
-    });
+    if (loginForm) {
+      loginForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        attemptLogin();
+      });
+    }
+
+    if (btnLogin) {
+      btnLogin.addEventListener('click', () => {
+        attemptLogin();
+      });
+    }
+
+    if (inputPin) {
+      inputPin.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          attemptLogin();
+        }
+      });
+    }
   }
 
   // Authenticate
   function attemptLogin() {
-    const pin = inputPin.value.trim();
-    const fullName = inputName.value.trim().replace(/\s+/g, ' ');
-    if (!fullName || fullName.length > 100) {
+    const pin = inputPin ? inputPin.value.trim() : '';
+    const fullName = inputName ? inputName.value.trim().replace(/\s+/g, ' ') : '';
+    if (inputName && (!fullName || fullName.length > 100)) {
       showLoginError('Please enter your name (1–100 characters).');
       inputName.focus();
       return;
@@ -148,7 +171,9 @@
       return;
     }
 
-    socket.emit('contestant:auth', { pin, fullName }, (res) => {
+    const authPayload = { pin };
+    if (fullName) authPayload.fullName = fullName;
+    socket.emit('contestant:auth', authPayload, (res) => {
       handleAuthResponse(res, pin);
     });
   }

@@ -413,16 +413,14 @@
       const timeStr = new Date().toLocaleTimeString();
       const padNum = String(alert.terminalNumber || pin).padStart(2, '0');
       const incType = alert.incidentType || alert.type || 'UNKNOWN';
-      const description = document.createElement('div');
-      const identity = document.createElement('strong');
-      identity.textContent = `${alert.fullName || 'Contestant'} — T${padNum} (PIN: ${pin})`;
-      description.appendChild(identity);
-      description.appendChild(document.createTextNode(`: ${incType}`));
-      const time = document.createElement('span');
-      time.style.cssText = 'font-size:0.75rem; color:var(--text-muted);';
-      time.textContent = timeStr;
-      item.appendChild(description);
-      item.appendChild(time);
+      const namePart = alert.fullName ? `${alert.fullName} — ` : '';
+      item.textContent = `${namePart}T${padNum} (PIN: ${pin}): ${incType} ${timeStr}`;
+      item.innerHTML = `
+        <div>
+          <strong>${escapeHtml(namePart)}T${escapeHtml(padNum)} (PIN: ${escapeHtml(pin)})</strong>: ${escapeHtml(incType)}
+        </div>
+        <span style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(timeStr)}</span>
+      `;
       elAlertFeed.prepend(item);
     }
   }
@@ -783,6 +781,16 @@
         reader.readAsText(file);
       });
     }
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 
   // Auto-run on DOM ready
