@@ -702,8 +702,15 @@
 
   function handleAnswerReveal(data) {
     if (!data) return;
+    if (data.totalScore !== undefined) {
+      elCurrentScore.textContent = `${data.totalScore} PTS`;
+      if (contestantProfile) contestantProfile.totalScore = data.totalScore;
+      if (currentSubmission) currentSubmission.totalScore = data.totalScore;
+    }
     const officialAnswer = (data.correctAnswer || '').trim();
     const correctUpper = officialAnswer.toUpperCase();
+    const answerLabel = data.correctAnswerText
+      ? `${data.correctAnswerText} (Option ${officialAnswer})` : officialAnswer;
 
     // Release stealth disguise on reveal
     if (elMcqContainer) elMcqContainer.classList.remove('is-locked');
@@ -741,7 +748,7 @@
         if (elQuestionCard) elQuestionCard.className = 'question-card status-correct';
         if (!isMcq && inputAnswer) inputAnswer.style.borderColor = 'var(--color-success)';
         const pts = (currentSubmission && currentSubmission.pointsAwarded) || (activeQuestion ? activeQuestion.points : 1);
-        showSubmissionStatus(`✓ Correct! Official Answer: "${officialAnswer}" • +${pts} Points Awarded`);
+        showSubmissionStatus(`✓ Correct! Official Answer: "${answerLabel}" • +${pts} Points Awarded`);
         if (window.QuizAudio) window.QuizAudio.playCorrect();
         if (currentSubmission && currentSubmission.totalScore !== undefined) {
           elCurrentScore.textContent = `${currentSubmission.totalScore} PTS`;
@@ -750,18 +757,18 @@
       } else if (isPending) {
         submittedAnswerStatus = 'PENDING';
         if (elQuestionCard) elQuestionCard.className = 'question-card status-pending';
-        showSubmissionStatus(`Official Answer: "${officialAnswer}" • Your answer ("${contestantAnswer}") is under Judge Review`);
+        showSubmissionStatus(`Official Answer: "${answerLabel}" • Your answer ("${contestantAnswer}") is under Judge Review`);
       } else {
         submittedAnswerStatus = 'INCORRECT';
         if (elQuestionCard) elQuestionCard.className = 'question-card status-incorrect';
         if (!isMcq && inputAnswer) inputAnswer.style.borderColor = 'var(--color-danger)';
-        showSubmissionStatus(`✗ Incorrect. Official Answer: "${officialAnswer}" • Your answer: "${contestantAnswer}"`);
+        showSubmissionStatus(`✗ Incorrect. Official Answer: "${answerLabel}" • Your answer: "${contestantAnswer}"`);
         if (window.QuizAudio) window.QuizAudio.playIncorrect();
       }
     } else {
       submittedAnswerStatus = 'INCORRECT';
       if (elQuestionCard) elQuestionCard.className = 'question-card status-incorrect';
-      showSubmissionStatus(`✗ Official Answer: "${officialAnswer}" • No submission recorded.`);
+      showSubmissionStatus(`✗ Official Answer: "${answerLabel}" • No submission recorded.`);
       if (window.QuizAudio) window.QuizAudio.playIncorrect();
     }
   }

@@ -118,7 +118,8 @@ describe('SocketHandler Unit Tests', () => {
     engine = new GameEngine({ graceWindowMs: 300, tickIntervalMs: 1000 });
     telemetryManager = new TelemetryManager({ db: dbMod, totalTerminals: 5, pinStart: 1001 });
     io = new MockIO();
-    handler = new SocketHandler(io, engine, dbMod, telemetryManager);
+    // Legacy scoring fixtures submit canonical letters. Shuffling has its own integration suite.
+    handler = new SocketHandler(io, engine, dbMod, telemetryManager, { shuffleConfig: { ENABLED: false } });
   });
 
   afterEach(() => {

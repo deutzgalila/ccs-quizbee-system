@@ -73,7 +73,14 @@ const TERMINAL_CONFIG = Object.freeze({
   PIN_END: 1060
 });
 
+const SHUFFLE_CONFIG = Object.freeze({
+  ENABLED: process.env.ENABLE_OPTION_SHUFFLE !== 'false',
+  MODE: 'PER_CONTESTANT',
+  SEED_SALT: process.env.SHUFFLE_SEED_SALT || 'OLFU_QUIZBEE_ITPM311'
+});
+
 module.exports = {
+  SHUFFLE_CONFIG,
   PORT,
   HOST,
   TIMING,
