@@ -23,6 +23,8 @@
   // DOM Elements - Login
   const sectionLogin = document.getElementById('login-section');
   const inputPin = document.getElementById('pin-input');
+  const inputName = document.getElementById('name-input');
+  const loginForm = document.getElementById('contestant-login-form');
   const btnLogin = document.getElementById('btn-login');
   const elLoginError = document.getElementById('login-error');
   const keypadButtons = document.querySelectorAll('.keypad-btn');
@@ -78,6 +80,7 @@
 
     // Check for saved session in localStorage
     const savedPin = localStorage.getItem('quizbee_pin');
+    inputName.value = localStorage.getItem('quizbee_name') || '';
     if (savedPin && inputPin) {
       inputPin.value = savedPin;
     }
@@ -112,31 +115,27 @@
           inputPin.value += key;
         }
 
-        if (inputPin.value.length === 4) {
-          attemptLogin();
-        }
       });
     });
   }
 
   function setupAuthEvents() {
-    if (inputPin) {
-      inputPin.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          attemptLogin();
-        }
-      });
-    }
-
-    if (btnLogin) {
-      btnLogin.addEventListener('click', attemptLogin);
-    }
+    loginForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      attemptLogin();
+    });
   }
 
   // Authenticate
   function attemptLogin() {
     const pin = inputPin.value.trim();
-    if (!pin || pin.length < 4) {
+    const fullName = inputName.value.trim().replace(/\s+/g, ' ');
+    if (!fullName || fullName.length > 100) {
+      showLoginError('Please enter your name (1–100 characters).');
+      inputName.focus();
+      return;
+    }
+    if (!/^\d{4}$/.test(pin)) {
       showLoginError('Please enter a valid 4-digit PIN (1001–1060).');
       return;
     }
@@ -149,7 +148,7 @@
       return;
     }
 
-    socket.emit('contestant:auth', { pin }, (res) => {
+    socket.emit('contestant:auth', { pin, fullName }, (res) => {
       handleAuthResponse(res, pin);
     });
   }
@@ -159,6 +158,7 @@
       currentPin = pin;
       contestantProfile = res.contestant || res || {};
       localStorage.setItem('quizbee_pin', pin);
+      localStorage.setItem('quizbee_name', contestantProfile.fullName || '');
 
       hideLoginError();
       sectionLogin.classList.add('hidden');
@@ -231,7 +231,7 @@
         }
       }
     } else {
-      showLoginError(res?.error === 'INVALID_PIN' ? 'Invalid PIN. Station not found.' : 'Authentication failed.');
+      showLoginError(res?.message || (res?.error === 'INVALID_PIN' ? 'Invalid PIN. Station not found.' : 'Authentication failed.'));
     }
   }
 
@@ -260,7 +260,8 @@
 
       // Auto-reconnect if PIN is stored
       const savedPin = localStorage.getItem('quizbee_pin');
-      if (savedPin) {
+      const savedName = localStorage.getItem('quizbee_name');
+      if (savedPin && savedName) {
         socket.emit('contestant:auth', { pin: savedPin }, (res) => {
           handleAuthResponse(res, savedPin);
         });
@@ -282,6 +283,7 @@
     // Evicted if duplicate login
     socket.on('contestant:kicked', (data) => {
       localStorage.removeItem('quizbee_pin');
+      localStorage.removeItem('quizbee_name');
       alert(data.message || 'Logged in from another workstation.');
       location.reload();
     });

@@ -347,13 +347,25 @@ class SocketHandler {
     }
 
     const pin = String(payload.pin).trim();
-    const contestant = this.db.getContestantByPin(pin);
+    let contestant = this.db.getContestantByPin(pin);
 
     if (!contestant) {
       const errRes = { success: false, error: 'INVALID_PIN' };
       ack(errRes);
       socket.emit('contestant:auth:ack', errRes);
       return;
+    }
+
+    if (payload.fullName !== undefined) {
+      const fullName = typeof payload.fullName === 'string'
+        ? payload.fullName.trim().replace(/\s+/g, ' ') : '';
+      if (!fullName || fullName.length > 100) {
+        const errRes = { success: false, error: 'INVALID_NAME', message: 'Please enter your name (1–100 characters).' };
+        ack(errRes);
+        socket.emit('contestant:auth:ack', errRes);
+        return;
+      }
+      contestant = this.db.updateContestantName(pin, fullName);
     }
 
     // 1. Authoritative Duplicate Session Eviction Protocol
@@ -443,6 +455,10 @@ class SocketHandler {
     ack(restorePayload);
     socket.emit('contestant:session:restore', restorePayload);
     socket.emit('contestant:auth:ack', restorePayload);
+
+    if (payload.fullName !== undefined) {
+      this.io.emit('leaderboard:update', { leaderboard: this.db.getLeaderboard(engineState.roundId) });
+    }
 
     // Broadcast presence update to Quizmaster
     this.io.to('room:quizmaster').emit('qm:telemetry:connection', {

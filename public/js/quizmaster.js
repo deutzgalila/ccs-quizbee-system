@@ -217,6 +217,8 @@
       if (data && Array.isArray(data.leaderboard)) {
         data.leaderboard.forEach((item) => {
           if (item && item.pin) {
+            const nameEl = document.getElementById(`name-${item.pin}`);
+            if (nameEl && item.fullName) nameEl.textContent = item.fullName;
             const scoreEl = document.getElementById(`score-${item.pin}`);
             const pts = item.score !== undefined ? item.score : item.totalScore;
             if (scoreEl && pts !== undefined) {
@@ -411,13 +413,16 @@
       const timeStr = new Date().toLocaleTimeString();
       const padNum = String(alert.terminalNumber || pin).padStart(2, '0');
       const incType = alert.incidentType || alert.type || 'UNKNOWN';
-      item.textContent = `T${padNum} (PIN: ${pin}): ${incType} ${timeStr}`;
-      item.innerHTML = `
-        <div>
-          <strong>T${padNum} (PIN: ${pin})</strong>: ${incType}
-        </div>
-        <span style="font-size:0.75rem; color:var(--text-muted);">${timeStr}</span>
-      `;
+      const description = document.createElement('div');
+      const identity = document.createElement('strong');
+      identity.textContent = `${alert.fullName || 'Contestant'} — T${padNum} (PIN: ${pin})`;
+      description.appendChild(identity);
+      description.appendChild(document.createTextNode(`: ${incType}`));
+      const time = document.createElement('span');
+      time.style.cssText = 'font-size:0.75rem; color:var(--text-muted);';
+      time.textContent = timeStr;
+      item.appendChild(description);
+      item.appendChild(time);
       elAlertFeed.prepend(item);
     }
   }
