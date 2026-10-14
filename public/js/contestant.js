@@ -547,7 +547,13 @@
       elMcqContainer.classList.remove('hidden');
 
       const opts = typeof q.options === 'string' ? JSON.parse(q.options) : (q.options || {});
+      const displayOrder = q.display_order || ['A', 'B', 'C', 'D'];
       ['A', 'B', 'C', 'D'].forEach((letter) => {
+        const btn = document.getElementById(`opt-${letter.toLowerCase()}`);
+        if (btn) {
+          const slotIndex = displayOrder.indexOf(letter);
+          btn.style.order = slotIndex !== -1 ? (slotIndex + 1) : 0;
+        }
         const textEl = document.getElementById(`text-opt-${letter.toLowerCase()}`);
         if (textEl) textEl.textContent = opts[letter] || `Option ${letter}`;
       });

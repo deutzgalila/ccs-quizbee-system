@@ -13,7 +13,7 @@
  */
 
 const { TIMING, SHUFFLE_CONFIG } = require('./config');
-const shuffleEngine = require('./shuffleEngine');
+const { getContestantDisplayOrder } = require('./shuffleEngine');
 const TelemetryManager = require('./telemetryManager');
 
 class SocketHandler {
@@ -78,7 +78,7 @@ class SocketHandler {
         prevPhase,
         newPhase,
         autoExpired: !!autoExpired,
-        state
+        state: this._canonicalGameState(state)
       });
 
       // Synchronize latest telemetry snapshot with Quizmaster
@@ -90,10 +90,10 @@ class SocketHandler {
         prevPhase,
         newPhase,
         autoExpired: !!autoExpired,
-        state
+        state: this._canonicalGameState(state)
       });
 
-      // 3. Preserve canonical projector options; personalize contestant options
+      // 3. Keep projector positions canonical; personalize contestant positions
       const sanitizedState = this._sanitizeGameState(state);
       this.io.to('room:projector').emit('game:phase:change', {
         prevPhase,
@@ -102,11 +102,13 @@ class SocketHandler {
         state: sanitizedState
       });
 
-      for (const socket of this._contestantSockets()) {
-        socket.emit('game:phase:change', {
-          prevPhase, newPhase, autoExpired: !!autoExpired,
-          state: this._sanitizeGameStateForContestant(state, socket.data.contestantId)
-        });
+      for (const socket of this.io.sockets.sockets.values()) {
+        if (socket.data?.role === 'CONTESTANT' && socket.data.authenticated && socket.rooms.has('room:contestants')) {
+          socket.emit('game:phase:change', {
+            prevPhase, newPhase, autoExpired: !!autoExpired,
+            state: this._sanitizeGameStateForContestant(state, socket.data.contestantId)
+          });
+        }
       }
 
       // Phase-specific dispatch
@@ -117,14 +119,11 @@ class SocketHandler {
           reason: autoExpired ? 'TIMEOUT' : 'FORCE_LOCK'
         });
       } else if (newPhase === 'REVEAL' && state.currentQuestion) {
-        this.io.to('room:projector').to('room:quizmaster').to('room:judges').emit('game:answer:reveal', {
+        this.io.emit('game:answer:reveal', {
           questionId: state.currentQuestion.id,
           correctAnswer: state.currentQuestion.correct_answer,
           explanation: state.currentQuestion.explanation || ''
         });
-        for (const socket of this._contestantSockets()) {
-          socket.emit('game:answer:reveal', this._contestantReveal(state.currentQuestion, socket.data.contestantId));
-        }
       } else if (newPhase === 'LEADERBOARD') {
         const leaderboard = this.db.getLeaderboard(state.roundId);
         this.io.emit('game:leaderboard', {
@@ -177,52 +176,30 @@ class SocketHandler {
       };
     }
 
+    if (sanitized.currentQuestion?.question_type === 'MCQ') {
+      sanitized.currentQuestion.display_order = ['A', 'B', 'C', 'D'];
+    }
     return sanitized;
   }
 
-  *_contestantSockets() {
-    for (const socket of this.io.sockets.sockets.values()) {
-      if (socket.data?.role === 'CONTESTANT' && socket.data.authenticated && socket.rooms.has('room:contestants')) {
-        yield socket;
-      }
-    }
-  }
-
-  _shuffleEnabled(question) {
-    return this.shuffleConfig.ENABLED && this.shuffleConfig.MODE === 'PER_CONTESTANT' &&
-      question?.question_type === 'MCQ';
-  }
-
-  _mappingQuestion(question) {
-    return { ...question, options: typeof question.options === 'string' ? JSON.parse(question.options) : question.options };
+  // Administrative clients keep full question data and canonical positions.
+  _canonicalGameState(state) {
+    if (!state?.currentQuestion || state.currentQuestion.question_type !== 'MCQ') return state;
+    return {
+      ...state,
+      currentQuestion: { ...state.currentQuestion, display_order: ['A', 'B', 'C', 'D'] }
+    };
   }
 
   _sanitizeGameStateForContestant(state, contestantId) {
     const sanitized = this._sanitizeGameState(state);
-    if (this._shuffleEnabled(state?.currentQuestion)) {
-      sanitized.currentQuestion.options = shuffleEngine.getContestantOptionMapping(
-        this._mappingQuestion(state.currentQuestion), contestantId, this.shuffleConfig.SEED_SALT
-      ).shuffledOptions;
+    if (sanitized?.currentQuestion?.question_type === 'MCQ' && this.shuffleConfig.ENABLED &&
+        this.shuffleConfig.MODE === 'LABEL_PRESERVING_POSITION') {
+      sanitized.currentQuestion.display_order = getContestantDisplayOrder(
+        sanitized.currentQuestion, contestantId, this.shuffleConfig.SEED_SALT
+      );
     }
     return sanitized;
-  }
-
-  _displayedAnswer(question, contestantId, answer) {
-    return this._shuffleEnabled(question)
-      ? shuffleEngine.toDisplayedAnswer(this._mappingQuestion(question), contestantId, answer, this.shuffleConfig.SEED_SALT)
-      : answer;
-  }
-
-  _contestantReveal(question, contestantId) {
-    const q = this._mappingQuestion(question);
-    const contestant = this.db.getContestantById(contestantId);
-    return {
-      totalScore: contestant?.total_score,
-      questionId: q.id,
-      correctAnswer: this._displayedAnswer(q, contestantId, q.correct_answer),
-      correctAnswerText: q.question_type === 'MCQ' ? (q.options?.[q.correct_answer] || '') : '',
-      explanation: q.explanation || ''
-    };
   }
 
   /**
@@ -281,7 +258,7 @@ class SocketHandler {
         const snapshot = this.telemetryManager.getSnapshot();
         const response = {
           success: true,
-          gameState: this.engine.getState(),
+          gameState: this._canonicalGameState(this.engine.getState()),
           telemetryGrid: snapshot.terminals,
           summary: snapshot.summary
         };
@@ -342,7 +319,7 @@ class SocketHandler {
         const pending = this._formatPendingDisputes(pendingRaw);
         const response = {
           success: true,
-          gameState: this.engine.getState(),
+          gameState: this._canonicalGameState(this.engine.getState()),
           pendingDisputes: pending
         };
         if (callback) callback(response);
@@ -445,13 +422,6 @@ class SocketHandler {
       this.socketToPin.delete(existingSocket.id);
     }
 
-    // Remove previous role subscriptions before granting a contestant session.
-    for (const room of [...socket.rooms]) {
-      if (room.startsWith('room:') || room.startsWith('contestant:')) socket.leave(room);
-    }
-    const previousPin = this.socketToPin.get(socket.id);
-    if (previousPin && previousPin !== pin) this.activeSocketsByPin.delete(previousPin);
-
     // 2. Bind new socket to workstation session
     this.activeSocketsByPin.set(pin, socket);
     this.socketToPin.set(socket.id, pin);
@@ -475,8 +445,6 @@ class SocketHandler {
     // 3. Session Rehydration
     const engineState = this.engine.getState();
     const sanitizedState = this._sanitizeGameStateForContestant(engineState, contestant.id);
-    const hideResult = this._shuffleEnabled(engineState.currentQuestion) &&
-      !['REVEAL', 'LEADERBOARD'].includes(engineState.phase);
 
     let submittedAnswer = null;
     let hasSubmitted = false;
@@ -490,7 +458,7 @@ class SocketHandler {
 
       if (priorSub) {
         hasSubmitted = true;
-        submittedAnswer = this._displayedAnswer(engineState.currentQuestion, contestant.id, priorSub.submitted_answer);
+        submittedAnswer = priorSub.submitted_answer;
         judgeStatus = priorSub.judge_status;
         awardedPoints = priorSub.awarded_points;
       }
@@ -505,29 +473,26 @@ class SocketHandler {
         studentId: contestant.student_id,
         fullName: contestant.full_name,
         department: contestant.department_or_section,
-        totalScore: hideResult ? contestant.total_score - awardedPoints : contestant.total_score
+        totalScore: contestant.total_score
       },
       gameState: sanitizedState,
       submissionStatus: {
         hasSubmitted,
         submittedAnswer,
         judgeStatus,
-        awardedPoints: hideResult ? null : awardedPoints
+        awardedPoints
       },
       session: {
         hasSubmitted,
         submittedAnswer,
         judgeStatus,
-        awardedPoints: hideResult ? null : awardedPoints
+        awardedPoints
       }
     };
 
     ack(restorePayload);
     socket.emit('contestant:session:restore', restorePayload);
     socket.emit('contestant:auth:ack', restorePayload);
-    if (engineState.currentQuestion && ['REVEAL', 'LEADERBOARD'].includes(engineState.phase)) {
-      socket.emit('game:answer:reveal', this._contestantReveal(engineState.currentQuestion, contestant.id));
-    }
 
     if (payload.fullName !== undefined) {
       this.io.emit('leaderboard:update', { leaderboard: this.db.getLeaderboard(engineState.roundId) });
@@ -658,7 +623,6 @@ class SocketHandler {
 
     // 3. Evaluate Submission
     const rawAnswer = String(payload.answer ?? '').trim();
-    let canonicalAnswer = rawAnswer;
     let isCorrect = 0;
     let judgeStatus = 'AUTO';
     let awardedPoints = 0;
@@ -666,10 +630,7 @@ class SocketHandler {
     const qType = currentQ.question_type || currentQ.type || 'MCQ';
 
     if (qType === 'MCQ') {
-      canonicalAnswer = this._shuffleEnabled(currentQ)
-        ? shuffleEngine.toCanonicalAnswer(this._mappingQuestion(currentQ), contestant.id, rawAnswer.toUpperCase(), this.shuffleConfig.SEED_SALT)
-        : rawAnswer;
-      const userClean = canonicalAnswer.toUpperCase();
+      const userClean = rawAnswer.toUpperCase();
       const correctClean = String(currentQ.correct_answer || currentQ.correctAnswer || '').trim().toUpperCase();
       isCorrect = userClean !== '' && userClean === correctClean ? 1 : 0;
       awardedPoints = isCorrect ? (currentQ.points || 1) : 0;
@@ -716,7 +677,7 @@ class SocketHandler {
       savedSub = this.db.saveSubmission(
         contestant.id,
         currentQ.id,
-        canonicalAnswer,
+        rawAnswer,
         serverTimestamp,
         isCorrect,
         judgeStatus,
@@ -751,9 +712,9 @@ class SocketHandler {
       questionId: currentQ.id,
       submittedAnswer: rawAnswer,
       serverTimeMs: serverTimestamp,
-      pointsAwarded: this._shuffleEnabled(currentQ) ? null : awardedPoints,
+      pointsAwarded: awardedPoints,
       judgeStatus,
-      totalScore: this._shuffleEnabled(currentQ) ? contestant.total_score : updatedContestant ? updatedContestant.total_score : contestant.total_score
+      totalScore: updatedContestant ? updatedContestant.total_score : contestant.total_score
     };
 
     ack(ackPayload);

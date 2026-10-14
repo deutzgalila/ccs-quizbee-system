@@ -1,4 +1,4 @@
-/** Deterministic, server-only option mappings. Never serialize mappings to clients. */
+/** Pure deterministic position shuffling. Letters always retain their option text. */
 function fnv1a(str) {
   let hash = 2166136261;
   for (let i = 0; i < str.length; i++) {
@@ -27,38 +27,16 @@ function shuffleArray(array, rng) {
   return result;
 }
 
-function getContestantOptionMapping(question, contestantId, salt = '') {
-  const options = question?.options;
-  const keys = options && typeof options === 'object' && !Array.isArray(options)
-    ? Object.keys(options).sort() : [];
-  const displayedToCanonical = {};
-  const canonicalToDisplayed = {};
-  const shuffle = question?.question_type === 'MCQ' && keys.length >= 2;
-  const order = shuffle
-    ? shuffleArray(keys, mulberry32(fnv1a(`${question.id}:${contestantId}:${salt}`)))
-    : keys;
-  const shuffledOptions = shuffle ? {} : options;
-  keys.forEach((displayed, i) => {
-    const canonical = order[i];
-    displayedToCanonical[displayed] = canonical;
-    canonicalToDisplayed[canonical] = displayed;
-    if (shuffle) shuffledOptions[displayed] = options[canonical];
-  });
-  const answer = question?.correct_answer;
-  return {
-    shuffledOptions, displayedToCanonical, canonicalToDisplayed,
-    displayedCorrectAnswer: Object.hasOwn(canonicalToDisplayed, answer) ? canonicalToDisplayed[answer] : answer
-  };
+function getContestantDisplayOrder(question, contestantId, salt = '') {
+  const keys = ['A', 'B', 'C', 'D'];
+  if (question?.question_type !== 'MCQ') return keys;
+  let options = question.options;
+  if (typeof options === 'string') {
+    try { options = JSON.parse(options); } catch (_) { return keys; }
+  }
+  if (!options || typeof options !== 'object' || Array.isArray(options) ||
+      keys.filter(key => Object.hasOwn(options, key)).length < 2) return keys;
+  return shuffleArray(keys, mulberry32(fnv1a(`${question.id}:${contestantId}:${salt}`)));
 }
 
-function toCanonicalAnswer(question, contestantId, answer, salt) {
-  const { displayedToCanonical } = getContestantOptionMapping(question, contestantId, salt);
-  return Object.hasOwn(displayedToCanonical, answer) ? displayedToCanonical[answer] : answer;
-}
-
-function toDisplayedAnswer(question, contestantId, answer, salt) {
-  const { canonicalToDisplayed } = getContestantOptionMapping(question, contestantId, salt);
-  return Object.hasOwn(canonicalToDisplayed, answer) ? canonicalToDisplayed[answer] : answer;
-}
-
-module.exports = { fnv1a, mulberry32, shuffleArray, getContestantOptionMapping, toCanonicalAnswer, toDisplayedAnswer };
+module.exports = { fnv1a, mulberry32, shuffleArray, getContestantDisplayOrder };
