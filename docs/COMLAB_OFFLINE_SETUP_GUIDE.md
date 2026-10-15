@@ -20,6 +20,7 @@
 - **File Size:** ~548 KB (clean, lightweight, portable)
 - **Included in Package:**
   - `start-windows.bat`: 1-click launcher, dependency checker, IP autodetection, and self-healing native module repair.
+  - `reset-database-windows.bat`: 1-click database & session reset utility (resets 60 terminals to 0 PTS, clears all submissions and cheat logs, reloads question bank).
   - `allow-firewall-windows.bat`: 1-click firewall configuration for Windows.
   - `quizbee.db`: Pre-seeded, ready-to-use SQLite database.
   - `sample_questions.csv` & `sample_trial_questions.csv`: Question banks.
