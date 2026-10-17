@@ -166,6 +166,13 @@
       background: #0b0f19;
     }
 
+    #panel-poster-parchment .preview-card,
+    #panel-poster-baroque .preview-card {
+      max-width: 680px;
+      aspect-ratio: 1200 / 1500;
+      background: #3b020e;
+    }
+
     /* Fallback Link Bar */
     .fallback-bar {
       margin-top: 1.5rem;
@@ -253,20 +260,35 @@
 
     <!-- View Tabs -->
     <div class="nav-tabs" role="tablist">
-      <button class="nav-tab-btn active" id="tab-stage" onclick="switchView('stage')">
+      <button class="nav-tab-btn active" id="tab-poster-parchment" onclick="switchView('poster-parchment')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+        </svg>
+        Themed Poster (Parchment)
+      </button>
+      <button class="nav-tab-btn" id="tab-poster-baroque" onclick="switchView('poster-baroque')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+        </svg>
+        Themed Poster (Baroque)
+      </button>
+      <button class="nav-tab-btn" id="tab-stage" onclick="switchView('stage')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
           <line x1="8" y1="21" x2="16" y2="21"></line>
           <line x1="12" y1="17" x2="12" y2="21"></line>
         </svg>
-        Stage Projector (16:9)
+        Stage (16:9)
       </button>
       <button class="nav-tab-btn" id="tab-standee" onclick="switchView('standee')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
           <line x1="12" y1="18" x2="12.01" y2="18"></line>
         </svg>
-        Standee Card (Portrait)
+        Standee
       </button>
     </div>
 
@@ -309,14 +331,28 @@
 
   <!-- Main Showcase Area -->
   <main class="showcase-container">
-    <!-- 1. Stage Projector View -->
-    <div id="panel-stage" class="view-panel active">
+    <!-- 1. Themed Poster (Parchment) -->
+    <div id="panel-poster-parchment" class="view-panel active">
+      <div class="preview-card">
+        <img id="img-poster-parchment" src="/images/evaluation_poster_official_parchment.png" alt="Official Themed Poster (Parchment)" class="preview-img">
+      </div>
+    </div>
+
+    <!-- 2. Themed Poster (Baroque) -->
+    <div id="panel-poster-baroque" class="view-panel">
+      <div class="preview-card">
+        <img id="img-poster-baroque" src="/images/evaluation_poster_official_baroque.png" alt="Official Themed Poster (Baroque)" class="preview-img">
+      </div>
+    </div>
+
+    <!-- 3. Stage Projector View -->
+    <div id="panel-stage" class="view-panel">
       <div class="preview-card">
         <img id="img-stage" src="/images/evaluation_qr_stage_dark.png" alt="Stage Projector Framed QR" class="preview-img">
       </div>
     </div>
 
-    <!-- 2. Standee Card View -->
+    <!-- 4. Standee Card View -->
     <div id="panel-standee" class="view-panel">
       <div class="preview-card">
         <img id="img-standee" src="/images/evaluation_qr_standee_dark.png" alt="Standee Card Framed QR" class="preview-img">
@@ -341,7 +377,7 @@
 
   <script src="/js/theme.js"></script>
   <script>
-    let currentView = 'stage';
+    let currentView = 'poster-parchment';
     let isDarkMode = true;
 
     function updateImages() {
@@ -355,8 +391,16 @@
       if (standeeImg) standeeImg.src = `/images/evaluation_qr_standee_${mode}.png`;
 
       if (downloadBtn) {
-        downloadBtn.href = `/images/evaluation_qr_${currentView}_${mode}.png`;
-        downloadBtn.setAttribute('download', `evaluation_qr_${currentView}_${mode}.png`);
+        if (currentView === 'poster-parchment') {
+          downloadBtn.href = '/images/evaluation_poster_official_parchment.png';
+          downloadBtn.setAttribute('download', 'evaluation_poster_official_parchment.png');
+        } else if (currentView === 'poster-baroque') {
+          downloadBtn.href = '/images/evaluation_poster_official_baroque.png';
+          downloadBtn.setAttribute('download', 'evaluation_poster_official_baroque.png');
+        } else {
+          downloadBtn.href = `/images/evaluation_qr_${currentView}_${mode}.png`;
+          downloadBtn.setAttribute('download', `evaluation_qr_${currentView}_${mode}.png`);
+        }
       }
 
       if (themeText) {
