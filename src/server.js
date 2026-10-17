@@ -121,6 +121,7 @@ app.get('/quizmaster', (req, res) => serveView(res, 'quizmaster.html', 'Quizmast
 app.get('/contestant', (req, res) => serveView(res, 'contestant.html', 'Contestant Terminal'));
 app.get('/projector', (req, res) => serveView(res, 'projector.html', 'Stage Projector Display'));
 app.get('/judge', (req, res) => serveView(res, 'judge.html', 'Judge Validation Panel'));
+app.get('/evaluation', (req, res) => serveView(res, 'evaluation-qr.html', 'Post-Quiz Bee Evaluation'));
 
 // -----------------------------------------------------------------------------
 // REST API Endpoints
