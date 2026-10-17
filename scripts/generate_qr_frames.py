@@ -31,8 +31,8 @@ def load_font(path, size):
     except Exception:
         return ImageFont.load_default()
 
-def draw_corner_reticles(draw, box, length=32, thickness=4, color=(16, 185, 129, 255), offset=14):
-    """Draw high-tech minimal camera viewfinder corner brackets."""
+def draw_corner_reticles(draw, box, length=38, thickness=4, color=(16, 185, 129, 255), offset=14):
+    """Draw high-tech minimal camera viewfinder corner brackets (100% uniform 90-degree brackets)."""
     x1, y1, x2, y2 = box
     x1 -= offset
     y1 -= offset
@@ -43,10 +43,8 @@ def draw_corner_reticles(draw, box, length=32, thickness=4, color=(16, 185, 129,
     draw.line([(x1, y1), (x1 + length, y1)], fill=color, width=thickness)
     draw.line([(x1, y1), (x1, y1 + length)], fill=color, width=thickness)
     
-    # Top-Right
+    # Top-Right (FIXED: Perfectly symmetrical horizontal & vertical segments, NO diagonal line!)
     draw.line([(x2, y1), (x2 - length, y1)], fill=color, width=thickness)
-    draw.line([(x2, y1), (x2 - length, y1 + length)], fill=color, width=thickness)
-    # Correct top-right vertical line
     draw.line([(x2, y1), (x2, y1 + length)], fill=color, width=thickness)
     
     # Bottom-Left
@@ -86,6 +84,40 @@ def draw_pill(draw, x, y, text, font, bg_color, text_color, border_color=None, p
     draw.text((x - tw // 2, y - th // 2 - 2), text, font=font, fill=text_color)
     return box
 
+def draw_badge_with_logo(canvas, draw, x, y, text, font, bg_color, text_color, border_color=None,
+                        logo_path=CCS_LOGO_PATH, logo_size=32, pad_x=20, pad_y=7, radius=18, align="center"):
+    """Draw a uniform, perfectly aligned pill badge with inline logo and typography (ZERO overlap)."""
+    tw, th = text_size(draw, text, font)
+    has_logo = os.path.exists(logo_path)
+    actual_logo_w = logo_size if has_logo else 0
+    gap = 12 if has_logo else 0
+    
+    total_inner_w = actual_logo_w + gap + tw
+    pill_w = total_inner_w + pad_x * 2
+    pill_h = max(logo_size, th) + pad_y * 2
+    
+    if align == "center":
+        box = [x - pill_w // 2, y - pill_h // 2, x + pill_w // 2, y + pill_h // 2]
+        start_x = x - total_inner_w // 2
+    else:  # left align
+        box = [x, y - pill_h // 2, x + pill_w, y + pill_h // 2]
+        start_x = x + pad_x
+        
+    draw.rounded_rectangle(box, radius=radius, fill=bg_color, outline=border_color, width=1 if border_color else 0)
+    
+    if has_logo:
+        try:
+            logo = Image.open(logo_path).convert("RGBA")
+            logo = logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+            canvas.paste(logo, (start_x, y - logo_size // 2), logo)
+        except Exception as e:
+            print("Logo load error:", e)
+            
+    text_x = start_x + actual_logo_w + gap
+    text_y = y - th // 2 - 2
+    draw.text((text_x, text_y), text, font=font, fill=text_color)
+    return box
+
 # ==========================================
 # 1. Vertical Standee (1200 x 1700)
 # ==========================================
@@ -100,7 +132,7 @@ def render_standee(dark_mode=True):
         canvas = Image.alpha_composite(canvas, glow_maroon)
         canvas = Image.alpha_composite(canvas, glow_emerald)
         
-        # Subtle grid dots or lines
+        # Subtle grid dots
         grid_draw = ImageDraw.Draw(canvas)
         dot_color = (255, 255, 255, 12)
         for gx in range(40, W, 40):
@@ -121,7 +153,7 @@ def render_standee(dark_mode=True):
     pill_text = (255, 228, 230, 255) if dark_mode else (159, 18, 57, 255)
 
     # Fonts
-    font_badge = load_font(FONT_SEMIBOLD, 20)
+    font_badge = load_font(FONT_SEMIBOLD, 18)
     font_title = load_font(FONT_BOLD, 46)
     font_subtitle = load_font(FONT_MEDIUM, 22)
     font_btn = load_font(FONT_BOLD, 20)
@@ -130,35 +162,29 @@ def render_standee(dark_mode=True):
     font_footer = load_font(FONT_MEDIUM, 18)
     font_footer_sub = load_font(FONT_REGULAR, 15)
 
-    # 1. Header Section
+    # 1. Header Section (Uniform, perfectly centered, NO OVERLAP)
     header_y = 110
     
-    # Optional CCS Logo badge
-    if os.path.exists(CCS_LOGO_PATH):
-        try:
-            logo = Image.open(CCS_LOGO_PATH).convert("RGBA")
-            logo = logo.resize((64, 64), Image.Resampling.LANCZOS)
-            canvas.paste(logo, (W // 2 - 280, header_y - 20), logo)
-        except Exception as e:
-            print("Logo load error:", e)
+    # Unified pill badge with integrated CCS emblem
+    draw_badge_with_logo(canvas, draw, W // 2, header_y,
+                        "OLFU COLLEGE OF COMPUTER STUDIES • IT OLYMPICS 2026",
+                        font_badge, pill_bg, pill_text, pill_border,
+                        logo_path=CCS_LOGO_PATH, logo_size=32, pad_x=22, pad_y=8, radius=18, align="center")
 
-    draw_pill(draw, W // 2 + 30, header_y + 12, "OLFU COLLEGE OF COMPUTER STUDIES • IT OLYMPICS 2026",
-              font_badge, pill_bg, pill_text, pill_border, pad_x=22, pad_y=8, radius=18)
-
-    # Title
+    # Title: "POST-QUIZ BEE EVALUATION" (Centered with ample breathing room)
     title_text = "POST-QUIZ BEE EVALUATION"
     tw, th = text_size(draw, title_text, font_title)
-    draw.text((W // 2 - tw // 2, header_y + 65), title_text, font=font_title, fill=text_primary)
+    draw.text((W // 2 - tw // 2, header_y + 55), title_text, font=font_title, fill=text_primary)
 
-    # Subtitle
+    # Subtitle: "Help us elevate the platform — your feedback shapes the next integration"
     sub_text = "Help us elevate the platform — your feedback shapes the next integration"
     sw, sh = text_size(draw, sub_text, font_subtitle)
-    draw.text((W // 2 - sw // 2, header_y + 128), sub_text, font=font_subtitle, fill=text_secondary)
+    draw.text((W // 2 - sw // 2, header_y + 118), sub_text, font=font_subtitle, fill=text_secondary)
 
     # 2. Hero QR Card Container
     card_w, card_h = 760, 890
     card_x1 = (W - card_w) // 2
-    card_y1 = header_y + 185
+    card_y1 = header_y + 175
     card_x2 = card_x1 + card_w
     card_y2 = card_y1 + card_h
 
@@ -181,7 +207,7 @@ def render_standee(dark_mode=True):
         qr_scaled = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
         canvas.paste(qr_scaled, (qr_cx - qr_size // 2, qr_cy - qr_size // 2), qr_scaled)
 
-    # Draw sleek viewfinder corner reticles around the QR box
+    # Draw sleek viewfinder corner reticles around the QR box (FIXED: 100% UNIFORM TOP-RIGHT CORNER)
     draw_corner_reticles(draw, qr_box, length=38, thickness=4, color=reticle_color, offset=14)
 
     # "POINT CAMERA TO SCAN" Action Pill
@@ -194,7 +220,6 @@ def render_standee(dark_mode=True):
     link_y = btn_y + 55
     link_text = f"Direct link: {FALLBACK_URL}"
     lw, lh = text_size(draw, link_text, font_mono)
-    # Subtle link box
     draw.rounded_rectangle([W // 2 - lw // 2 - 16, link_y - 4, W // 2 + lw // 2 + 16, link_y + lh + 4],
                            radius=8, fill=(15, 23, 42, 160) if dark_mode else (241, 245, 249, 255))
     draw.text((W // 2 - lw // 2, link_y), link_text, font=font_mono, fill=text_accent)
@@ -254,7 +279,6 @@ def render_stage(dark_mode=True):
         canvas = Image.alpha_composite(canvas, glow_maroon)
         canvas = Image.alpha_composite(canvas, glow_emerald)
         
-        # Subtle grid dots
         grid_draw = ImageDraw.Draw(canvas)
         dot_color = (255, 255, 255, 10)
         for gx in range(40, W, 40):
@@ -263,7 +287,6 @@ def render_stage(dark_mode=True):
 
     draw = ImageDraw.Draw(canvas)
 
-    # Theme colors
     text_primary = (248, 250, 252, 255) if dark_mode else (15, 23, 42, 255)
     text_secondary = (148, 163, 184, 255) if dark_mode else (100, 116, 139, 255)
     text_accent = (52, 211, 153, 255) if dark_mode else (5, 150, 105, 255)
@@ -274,7 +297,6 @@ def render_stage(dark_mode=True):
     pill_border = (244, 63, 94, 180) if dark_mode else (244, 114, 182, 180)
     pill_text = (255, 228, 230, 255) if dark_mode else (159, 18, 57, 255)
 
-    # Fonts
     font_badge = load_font(FONT_SEMIBOLD, 18)
     font_hero = load_font(FONT_BOLD, 52)
     font_hero_sub = load_font(FONT_MEDIUM, 24)
@@ -289,48 +311,35 @@ def render_stage(dark_mode=True):
     col_x = 130
     top_y = 120
 
-    # Badge Row
-    if os.path.exists(CCS_LOGO_PATH):
-        try:
-            logo = Image.open(CCS_LOGO_PATH).convert("RGBA")
-            logo = logo.resize((52, 52), Image.Resampling.LANCZOS)
-            canvas.paste(logo, (col_x, top_y - 12), logo)
-        except Exception as e:
-            print("Logo error:", e)
+    # Unified Left-Aligned Badge
+    draw_badge_with_logo(canvas, draw, col_x, top_y + 14,
+                        "OLFU IT OLYMPICS 2026 • OFFICIAL EVALUATION",
+                        font_badge, pill_bg, pill_text, pill_border,
+                        logo_path=CCS_LOGO_PATH, logo_size=32, pad_x=20, pad_y=7, radius=16, align="left")
 
-    draw_pill(draw, col_x + 320, top_y + 14, "OLFU IT OLYMPICS 2026 • OFFICIAL EVALUATION",
-              font_badge, pill_bg, pill_text, pill_border, pad_x=20, pad_y=8, radius=16)
-
-    # Main Hero Title
     hero_title = "Participant Evaluation"
     draw.text((col_x, top_y + 65), hero_title, font=font_hero, fill=text_primary)
 
-    # Hero Subtitle
     hero_sub = "Help us elevate the platform — your feedback shapes the next integration."
     draw.text((col_x, top_y + 140), hero_sub, font=font_hero_sub, fill=text_secondary)
 
-    # Bullet / Value props
     bullets = [
-        ("⚡ Quick & Anonymous", "Takes only 2-3 minutes. All responses are 100% confidential."),
-        ("🎯 Real-Time Experience", "Rate interface clarity, countdown pacing, and buzzer responsiveness."),
-        ("💡 Suggest Enhancements", "Directly guide the development roadmap for IT Olympics 2027.")
+        ("Quick & Anonymous", "Takes only 2-3 minutes. All responses are 100% confidential."),
+        ("Real-Time Experience", "Rate interface clarity, countdown pacing, and buzzer responsiveness."),
+        ("Suggest Enhancements", "Directly guide the development roadmap for IT Olympics 2027.")
     ]
 
     bullet_start_y = top_y + 220
     for i, (b_title, b_desc) in enumerate(bullets):
         by = bullet_start_y + i * 82
-        # Bullet indicator box
         draw.rounded_rectangle([col_x, by, col_x + 36, by + 36], radius=10,
                                fill=(16, 185, 129, 40) if dark_mode else (241, 245, 249, 255),
                                outline=reticle_color, width=1)
-        # Checkmark
         draw.line([(col_x + 10, by + 18), (col_x + 16, by + 24), (col_x + 26, by + 12)],
                   fill=reticle_color, width=3)
-        # Text
         draw.text((col_x + 52, by + 1), b_title, font=font_bullet_title, fill=text_primary)
         draw.text((col_x + 52, by + 27), b_desc, font=font_bullet_desc, fill=text_secondary)
 
-    # Workstation isolate notice & fallback link
     notice_box_y = bullet_start_y + 275
     nb_w, nb_h = 760, 115
     draw.rounded_rectangle([col_x, notice_box_y, col_x + nb_w, notice_box_y + nb_h],
@@ -338,7 +347,7 @@ def render_stage(dark_mode=True):
                            fill=(18, 25, 41, 200) if dark_mode else (241, 245, 249, 255),
                            outline=(45, 58, 86, 180) if dark_mode else (226, 232, 240, 255), width=1)
 
-    notice_icon_text = "🔒 Lab Network Isolation Notice:"
+    notice_icon_text = "NOTE: Lab Network Isolation Notice:"
     draw.text((col_x + 24, notice_box_y + 18), notice_icon_text, font=font_notice, fill=(251, 191, 36, 255))
     notice_sub = "Lab workstations are isolated from WAN. Please scan using your mobile phone camera."
     draw.text((col_x + 24, notice_box_y + 44), notice_sub, font=font_notice, fill=text_secondary)
@@ -346,17 +355,15 @@ def render_stage(dark_mode=True):
     direct_link_text = f"Direct browser link: {FALLBACK_URL}"
     draw.text((col_x + 24, notice_box_y + 74), direct_link_text, font=font_mono, fill=text_accent)
 
-    # Right Column: Framed QR Card (X: 1150 to 1770)
+    # Right Column: Framed QR Card
     card_w, card_h = 620, 770
     card_x1 = 1170
     card_y1 = 120
     card_x2 = card_x1 + card_w
     card_y2 = card_y1 + card_h
 
-    # Card backdrop
     draw.rounded_rectangle([card_x1, card_y1, card_x2, card_y2], radius=28, fill=card_bg, outline=card_border, width=2)
 
-    # Pristine white QR box
     qr_canvas_size = 500
     qr_cx = card_x1 + card_w // 2
     qr_cy = card_y1 + 40 + qr_canvas_size // 2
@@ -364,27 +371,23 @@ def render_stage(dark_mode=True):
               qr_cx + qr_canvas_size // 2, qr_cy + qr_canvas_size // 2]
     draw.rounded_rectangle(qr_box, radius=22, fill=(255, 255, 255, 255), outline=(226, 232, 240, 255), width=2)
 
-    # Paste QR
     if os.path.exists(SOURCE_QR_PATH):
         qr_img = Image.open(SOURCE_QR_PATH).convert("RGBA")
         qr_size = 430
         qr_scaled = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
         canvas.paste(qr_scaled, (qr_cx - qr_size // 2, qr_cy - qr_size // 2), qr_scaled)
 
-    # Viewfinder reticles
+    # Uniform 90-degree corner reticles (FIXED)
     draw_corner_reticles(draw, qr_box, length=34, thickness=4, color=reticle_color, offset=14)
 
-    # Card bottom button
     btn_y = card_y1 + 610
     btn_bg = (16, 185, 129, 230) if dark_mode else (15, 23, 42, 240)
     draw_pill(draw, qr_cx, btn_y, "POINT CAMERA TO SCAN", font_btn, btn_bg, (255, 255, 255, 255), pad_x=28, pad_y=12, radius=20)
 
-    # Status tag under button
-    tag_text = "● Ready to Scan • No App Required"
+    tag_text = "Ready to Scan • No App Required"
     tw, th = text_size(draw, tag_text, font_notice)
     draw.text((qr_cx - tw // 2, btn_y + 46), tag_text, font=font_notice, fill=text_secondary)
 
-    # Bottom Full-width Footer Bar
     bar_y = H - 75
     draw.line([(100, bar_y), (W - 100, bar_y)], fill=(45, 58, 86, 120) if dark_mode else (226, 232, 240, 255), width=1)
     
@@ -395,7 +398,6 @@ def render_stage(dark_mode=True):
     rw, rh = text_size(draw, foot_right, font_footer)
     draw.text((W - 120 - rw, bar_y + 24), foot_right, font=font_footer, fill=text_secondary)
 
-    # Save
     filename = "evaluation_qr_stage_dark.png" if dark_mode else "evaluation_qr_stage_light.png"
     filepath = os.path.join(OUTPUT_DIR, filename)
     canvas.save(filepath, "PNG", dpi=(300, 300))
@@ -403,9 +405,9 @@ def render_stage(dark_mode=True):
     return filepath
 
 if __name__ == "__main__":
-    print("Generating framed QR assets...")
+    print("Generating fixed framed QR assets...")
     f1 = render_standee(dark_mode=True)
     f2 = render_standee(dark_mode=False)
     f3 = render_stage(dark_mode=True)
     f4 = render_stage(dark_mode=False)
-    print("All framed QR assets generated successfully!")
+    print("All fixed framed QR assets generated successfully!")
